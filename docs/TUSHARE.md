@@ -111,6 +111,11 @@ is_approximate()                                  # False：已装真实日历
 5. **复权口径切换**：`qfq` 序列会随新的除权事件变化，跨日期保存的指标不可直接比较；回测请固定一种口径并记录。
 6. **积分限流**：适配器未做本地限流与缓存；大批量回测可能触发 Tushare 频率限制
    （表现为 `VendorUnavailableError` → 回落 Yahoo）。需要时再加"限流 + 磁盘缓存"。
+7. **北交所没有备源**：Yahoo 不提供 `.BJ` 行情，所以 BJ 标的的链实际上只有 Tushare 一家；
+   Tushare 失败时直接是 `NO_DATA_AVAILABLE`，不会回退（已实测 `920002.BJ` 正常，`430047.BJ` 这类不存在的代码抛 `NoMarketDataError`）。
+8. **日历只装了上交所（SSE）**：本账号下 `trade_cal(exchange="BSE")` 返回 0 行，
+   因此北交所标的暂时沿用 SSE 日历（节假日基本一致，个别交易日可能不同）。
+   `load_calendar(..., exchange=...)` 已留参数，拿到 BSE 权限后可直接切换。
 
 ---
 
@@ -126,3 +131,25 @@ TUSHARE_TOKEN=... .venv/bin/python -m pytest -q -m integration tests/downstream/
 
 离线测试用 `client.set_api(FakeApi(...))` 注入假客户端，覆盖：非 A 股让位、空结果、限流异常、
 复权参数传参、单位换算、排序、日期校验、日历安装与节假日判定。
+
+---
+
+## 8. 真实冒烟记录（2026-11-01，账号 2000+ 积分）
+
+环境：`tushare 1.4.29`、`pandas 3.1.0`、Python 3.13.12，token 来自 `.env`。
+
+| 检查项 | 实测结果 |
+| --- | --- |
+| `pytest -m integration tests/downstream/test_tushare_live.py` | **2 passed**（3.26s） |
+| `activate()` 注册 | `(get_stock_data, tushare)`；链 `tushare,yfinance`；`cn_adjust=qfq` |
+| 直接调用 `get_stock_data("600519.SH", 2026-09-22..2026-11-01)` | 23 条日线，首行 2026-09-22，末行 2026-10-30（今天 11-01 为周日，无当日数据） |
+| 经 `router.route_to_vendor` | 与直接调用**完全一致**（证明注册进路由表生效） |
+| 单位换算 | Tushare `vol=59927.29 手 / amount=8257381.778 千元` → 输出 `5992729 股 / 8257381778 元` |
+| 复权生效 | 含分红窗口（2026-06-01..07-15，32 个交易日）：`qfq` 与不复权有 **18 行**不同，`hfq` 有 **32 行**不同 |
+| 交易日历 | 全年 19 个"工作日但休市"日期；2026-10-01 国庆 `False`、2026-10-08 `True`、2026-11-01 周日 `False` |
+| 深市 | `000001.SZ` 正常 23 条 |
+| 北交所 | `920002.BJ` 正常 38 条（`bj920002` 写法亦可）；不存在的 `430047.BJ` → `NoMarketDataError` |
+| 非 A 股让位 | `AAPL` → `NoMarketDataError`，链继续走 Yahoo |
+| `trade_cal(exchange="BSE")` | 0 行（本账号无北交所日历权限）→ 见限制 8 |
+
+> 冒烟脚本是一次性的（`/tmp` 下，未入库）。需要复现时跑第 7 节的 `-m integration` 测试即可。

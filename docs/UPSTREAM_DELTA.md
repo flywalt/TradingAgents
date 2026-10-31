@@ -51,7 +51,8 @@
 | D-0001 | `ffab0e2` `docs(governance)` | docs | 建立 `AGENTS.md` + `docs/` 四份规范（本文件、`UPSTREAM_SYNC.md`、`ARCHITECTURE.md`、`EXTENSION_POINTS.md`） | 无（纯新增 5 个文件） | 无 | 不涉及代码，跑全量测试确认无副作用（1412 passed） |
 | D-0002 | `d733340` `docs(sync)` | docs | 回填 rebase 演练结果、冲突探测结论与提交哈希 | 无 | 无 | 同上 |
 | D-0003 | `7d626cd` `feat(downstream)` | feat | 下游骨架 `tradingagents_cn/`（注册/配置/代码规范化/交易日历/交易规则/适配器公共层）+ `tests/downstream/` 110 个测试（含**同步保险丝**） | 无 | 无 | 全量 `1522 passed, 1 skipped`；`ruff check .` 全绿 |
-| D-0004 | 本条提交 `feat(tushare)` | feat | Tushare 行情 vendor（`get_stock_data`，含 `cn_adjust` 复权）+ `trade_cal` 交易日历 + `docs/TUSHARE.md` + 16 个离线测试 + 2 个 `integration` 冒烟 | 无 | 无 | 全量 `1538 passed, 1 skipped`；integration 需 `TUSHARE_TOKEN` |
+| D-0004 | `8d0ffb6` `feat(tushare)` | feat | Tushare 行情 vendor（`get_stock_data`，含 `cn_adjust` 复权）+ `trade_cal` 交易日历 + `docs/TUSHARE.md` + 16 个离线测试 + 2 个 `integration` 冒烟 | 无 | 无 | 全量 `1538 passed, 1 skipped`；integration 需 `TUSHARE_TOKEN` |
+| D-0005 | 本条提交 `test(tushare)` | test/docs | 真实冒烟记录（单位/复权/日历/北交所实测）+ 北交所 integration 用例 + 2 条已知限制 | 无 | 无 | offline `1538 passed`；`-m integration` → **3 passed** |
 
 四条下游提交合计新增代码与文档，**0 行上游改动**。下游与上游的唯一耦合是文档里登记的"脆弱耦合"，
 现在由 `tests/downstream/test_sync_guard.py`（12 组断言）机械锁定。

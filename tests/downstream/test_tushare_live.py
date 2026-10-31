@@ -53,3 +53,19 @@ def test_live_exchange_calendar_closes_a_known_holiday():
 
     assert calendar.is_trading_day("2026-10-01") is False   # 国庆
     assert calendar.is_trading_day("2026-10-09") is True
+
+
+def test_live_beijing_symbol_is_served_even_though_yahoo_has_no_listing():
+    """BJ has no Yahoo fallback, so this is the one market Tushare must serve."""
+    _skip_without_prerequisites()
+    from tradingagents_cn.vendors.tushare import client
+    from tradingagents_cn.vendors.tushare.stock import get_stock_data
+
+    client.reset_api()
+    end = date.today()
+    start = end - timedelta(days=60)
+    text = get_stock_data("920002.BJ", start.isoformat(), end.isoformat())
+
+    assert text.startswith("# Stock data for 920002.BJ")
+    rows = [line for line in text.splitlines() if line and not line.startswith("#")]
+    assert len(rows) > 1, "no Beijing bars returned in the last 60 days"
