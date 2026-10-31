@@ -49,9 +49,23 @@
 | 编号 | Commit | 类型 | 内容 | 触碰上游文件 | 冲突风险 | 测试 |
 | --- | --- | --- | --- | --- | --- | --- |
 | D-0001 | `ffab0e2` `docs(governance)` | docs | 建立 `AGENTS.md` + `docs/` 四份规范（本文件、`UPSTREAM_SYNC.md`、`ARCHITECTURE.md`、`EXTENSION_POINTS.md`） | 无（纯新增 5 个文件） | 无 | 不涉及代码，跑全量测试确认无副作用（1412 passed） |
-| D-0002 | 本条提交 `docs(sync)` | docs | 回填 rebase 演练结果、冲突探测结论与提交哈希 | 无 | 无 | 同上 |
+| D-0002 | `d733340` `docs(sync)` | docs | 回填 rebase 演练结果、冲突探测结论与提交哈希 | 无 | 无 | 同上 |
+| D-0003 | 本条提交 `feat(downstream)` | feat | 下游骨架 `tradingagents_cn/`（注册/配置/代码规范化/交易日历/交易规则/适配器公共层）+ `tests/downstream/` 110 个测试（含**同步保险丝**） | 无 | 无 | 全量 `1522 passed, 1 skipped`；`ruff check .` 全绿 |
 
-两条下游提交合计新增 5 个文件、0 行上游改动 → **当前下游差异仅存在于文档**。
+三条下游提交合计新增代码与文档，**0 行上游改动**。下游与上游的唯一耦合是文档里登记的"脆弱耦合"，
+现在由 `tests/downstream/test_sync_guard.py`（12 组断言）机械锁定。
+
+### 2.1 已实现的下游文件（D-0003）
+
+| 文件 | 作用 |
+| --- | --- |
+| `tradingagents_cn/register.py` | `activate()` / `register_vendor()` / `reset()`：幂等注册到 `router.VENDOR_METHODS`，可完整回滚 |
+| `tradingagents_cn/config.py` | `cn_*` 配置键、有序 vendor 链（`tushare,yfinance`）、`TRADINGAGENTS_CN_*` 环境变量、纯函数合并 |
+| `tradingagents_cn/symbols.py` | A 股代码规范化（`.SH/.SZ/.BJ`）、Yahoo/Tushare 双向外形、交易所前缀推断 |
+| `tradingagents_cn/calendar.py` | 交易日历（周末 + 可注入节假日），`set_default_calendar()` 供 vendor 安装真实日历 |
+| `tradingagents_cn/trading_rules.py` | 涨跌停比例与限价（Decimal 半进位）、整手规则、T+1 交收 |
+| `tradingagents_cn/vendors/common.py` | 适配器公共层：`require_ashare` / `require_token` / `adjustment` / `no_rows` |
+| `tests/downstream/test_sync_guard.py` | 脆弱耦合保险丝（router 表、错误类型、state key、agent 工厂、图注入点、评级、报告、provider） |
 
 > 目前**没有任何上游代码修改**（无 `upstream-patch:` 提交）。这是有意的：本阶段的结论是
 > "数据层扩展零改动可行，agent/prompt/报告补丁暂缓"（见 `docs/EXTENSION_POINTS.md` 第 8 节）。

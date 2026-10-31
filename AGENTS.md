@@ -102,6 +102,9 @@ docs/                  # 下游文档（本套规范）
 
 # 上游 + 下游，含联网测试（需要 key，慎用）
 .venv/bin/python -m pytest -q -m "not integration"
+
+# 代码风格（上游 ruff 配置：line-length 100，py311）
+.venv/bin/python -m ruff check .
 ```
 
 - 提交前**必须**跑一次全量测试，并在 commit message 或 PR 描述里贴结果
