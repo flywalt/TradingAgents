@@ -48,8 +48,10 @@
 
 | 编号 | Commit | 类型 | 内容 | 触碰上游文件 | 冲突风险 | 测试 |
 | --- | --- | --- | --- | --- | --- | --- |
-| D-0001 | `docs(governance)` | docs | 建立 `AGENTS.md` + `docs/` 四份规范（本文件、`UPSTREAM_SYNC.md`、`ARCHITECTURE.md`、`EXTENSION_POINTS.md`） | 无（纯新增） | 无 | 不涉及代码，跑全量测试确认无副作用 |
-| D-0002 | `docs(sync)` | docs | 回填同步演练结果与提交哈希 | 无 | 无 | 同上 |
+| D-0001 | `ffab0e2` `docs(governance)` | docs | 建立 `AGENTS.md` + `docs/` 四份规范（本文件、`UPSTREAM_SYNC.md`、`ARCHITECTURE.md`、`EXTENSION_POINTS.md`） | 无（纯新增 5 个文件） | 无 | 不涉及代码，跑全量测试确认无副作用（1412 passed） |
+| D-0002 | 本条提交 `docs(sync)` | docs | 回填 rebase 演练结果、冲突探测结论与提交哈希 | 无 | 无 | 同上 |
+
+两条下游提交合计新增 5 个文件、0 行上游改动 → **当前下游差异仅存在于文档**。
 
 > 目前**没有任何上游代码修改**（无 `upstream-patch:` 提交）。这是有意的：本阶段的结论是
 > "数据层扩展零改动可行，agent/prompt/报告补丁暂缓"（见 `docs/EXTENSION_POINTS.md` 第 8 节）。
@@ -89,4 +91,12 @@
 
 | 日期 | 动作 | 从 | 到 | 结果 |
 | --- | --- | --- | --- | --- |
-| 2026-10-31 | 建立基线、添加 `upstream` remote、演练 rebase | `v0.7.0` (`f802271`) | `v0.7.1` (`c454491`) | 见 `docs/UPSTREAM_SYNC.md` 第 6 节 |
+| 2026-10-31 | 建立基线、添加 `upstream` remote、演练 rebase | `v0.7.0` (`e8f5503`) | `v0.7.1` (`c454491`) | ✅ 0 冲突，1412 passed。详见 `docs/UPSTREAM_SYNC.md` 第 6 节 |
+
+### 4.1 上游区间风险提示（v0.7.0 → v0.7.1，22 提交 / 37 文件）
+
+- 上游**本次改动**了补丁候选文件：`tradingagents/reporting.py`（P4）、`tradingagents/agents/tools.py`（P5）、
+  `tradingagents/graph/trading_graph.py`、`tradingagents/dataflows/date_window.py`。
+- 上游**本次未改动**：`dataflows/router.py`（P1）、`graph/setup.py`、`graph/analyst_execution.py`、
+  `agents/state.py`、`default_config.py`（P2 相关）。→ 补丁优先落在这些文件，冲突概率最低。
+- 实测结论：冲突按**行**判定，同一文件内相隔 ≥3 行的改动可自动合并；只有下游改制的行被上游重写时才冲突。

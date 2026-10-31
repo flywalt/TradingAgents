@@ -198,27 +198,87 @@ main:  ... f802271 (v0.7.0) ──► c454491 (v0.7.1, upstream/main)
 
 ---
 
-## 6. 演练记录（2026-10-31）
+## 6. 演练记录（2026-10-31，已执行）
+
+### 6.0 演练环境
+
+| 项目 | 值 |
+| --- | --- |
+| 临时工作区 | `/tmp/opencode/sync-drill`（`git worktree`，演练后已删除） |
+| 演练分支 | `drill/downstream-on-v0.7.0`（演练后已删除） |
+| 基线起点 | tag `v0.7.0` = `e8f5503`（Merge PR #1536）。注意：分支 `origin/v0.7.0` 的 release 提交是 `f802271`，tag 指在它之上 |
+| 上游目标 | `upstream/main` = `c454491` (v0.7.1) |
+| 上游区间规模 | **22 个提交，37 个文件，+688 / −117** |
 
 ### 6.1 演练 1：下游提交落在 `v0.7.0` 基线，rebase 到 `v0.7.1`
 
 | 步骤 | 命令 | 结果 |
 | --- | --- | --- |
-| 建立临时工作区 | `git worktree add /tmp/opencode/sync-drill -b drill/downstream-on-v0.7.0 v0.7.0` | 成功，起点 `f802271`（v0.7.0） |
-| 模拟下游提交 | `git cherry-pick <D-0001>` | 成功，无冲突（下游文件全部是新增文件） |
-| 取上游 | `git fetch upstream --tags` | 成功 |
-| 基线前进 | `git rebase upstream/main` | **见下方实测结果** |
-| 冲突 | — | 见下方 |
-| 测试 | `.venv/bin/python -m pytest -q` | 见下方 |
-| 清理 | `git worktree remove` + 删临时分支 | 待执行 |
+| 建立临时工作区 | `git worktree add /tmp/opencode/sync-drill -b drill/downstream-on-v0.7.0 v0.7.0` | ✅ 起点 `e8f5503` |
+| 模拟下游提交 | `git cherry-pick ffab0e2`（D-0001 文档提交） | ✅ 生成 `e8543cd`，**无冲突** |
+| 取上游 | `git fetch upstream --tags` | ✅ 标签/分支全部就绪 |
+| 基线前进 | `git rebase upstream/main` | ✅ **成功，0 冲突** → `d4b71ec` |
+| 历史检查 | `git log --oneline --graph` | ✅ 线性：`d4b71ec` → `c454491`（上游自身的 merge 提交保留在上游侧） |
+| 全量测试 | `.venv/bin/python -m pytest -q` | ✅ **1412 passed, 1 skipped, 1 deselected, 100 subtests**（25.82s） |
+| 导入验证 | `python -c "import tradingagents"` | ✅ 解析到**工作区**源码 `/tmp/opencode/sync-drill/tradingagents`，版本 0.7.1 |
+| 清理 | `git worktree remove --force` + `git branch -D` | ✅ 临时分支 `drill/downstream-on-v0.7.0`、`drill/conflict-probe` 已删除 |
 
-> 详细数字在演练执行后回填（本文件 D-0002 提交）。
+**为什么 0 冲突（可复现的证据）**：
 
-### 6.2 演练结论模板
+```bash
+# 上游本次改动的文件 ∩ 下游自有文件 = 空集
+comm -12 <(git diff --name-only v0.7.0..upstream/main | sort) \
+         <(git ls-tree -r --name-only HEAD | grep -E '^(AGENTS.md|docs/)' | sort)
+# → 无输出
+```
 
-- 上游 `v0.7.0 → v0.7.1` 之间改动：见 `git log --oneline v0.7.0..v0.7.1`（上游发布说明见 `CHANGELOG.md`）。
-- 下游 docs-only 提交在该区间**不产生冲突**（结论：早期阶段下游与上游几乎零耦合，正是把规范先立起来的窗口期）。
-- 一旦开始触碰上游文件，冲突率取决于补丁文件与上游改动文件的重叠度 → 所以补丁要**单文件、小、按文件聚合**。
+下游提交 100% 是新增文件（`AGENTS.md` + `docs/*.md`），没有一行触碰上游文件，因此 rebase 退化为"前移基点"。
+
+### 6.2 演练 2：冲突场景探测（**仅探测，不产生生产改动**）
+
+为验证"冲突发生时流程仍可用"，在同一个临时 worktree 里用 4 个临时提交探测冲突边界，
+探针全部留在演练分支、演练后删除，**从未进入 `main`**：
+
+| 探针 | 下游改动位置 | 上游同区间是否改过该处 | 结果 |
+| --- | --- | --- | --- |
+| A | `reporting.py` 的 `_SECTIONS` 中插入新章节 | ❌ 未改 `_SECTIONS` | ✅ 自动合并，无冲突 |
+| B | `write_report_tree()` 开头的局部赋值行 | ⚠️ 改了同函数的 docstring 尾部 | ✅ 自动合并（改动行距 ≥3 行） |
+| C | `reporting.py` 文件末尾追加常量 | ⚠️ 在 `return` 前插入了 14 行 | ✅ 自动合并 |
+| D | `date_window.py::as_of()` **被上游重写的那 3 行** | ✅ 重写 | ❌ **CONFLICT (content)**，`UU tradingagents/dataflows/date_window.py` |
+
+探针 D 的冲突现场与解决方式（演练中实际执行）：
+
+```text
+<<<<<<< HEAD                       # 上游 v0.7.1 的新实现
+    if not trade_date:
+        return requested if parsed is None else f"{parsed:%Y-%m-%d}"
+    return f"{parsed:%Y-%m-%d}" if parsed is not None and parsed <= _parse(trade_date) else trade_date
+=======
+    # DRILL PROBE D: downstream re-implements the clamp
+    return requested if parsed is not None and parsed <= _parse(trade_date) else trade_date
+>>>>>>> eacd880 (upstream-patch: drill probe D)
+```
+
+解决策略（与第 3 节"冲突处理策略"一致）：**以上游版本为底，重放下游意图**
+（保留上游的 canonical-date 实现，只把下游那行注释意图加回去）→ `git add` → `git rebase --continue`
+→ 生成 `e590ef1`；随后 `pytest tests/test_date_boundaries.py` → **2 passed**。
+
+### 6.3 结论与对补丁计划的影响
+
+1. **当前阶段（docs-only）同步零风险**：22 个上游提交、37 个文件的变化全部落在上游自有文件上，
+   下游 rebase 无冲突。这正是"先把规范立起来、再动代码"的窗口期。
+2. **冲突不是按文件判定，而是按行判定**：同一个文件里，只要下游改的行与上游改的行相隔 ≥3 行，
+   git 就能自动合并（探针 B/C）。真正的冲突只发生在**下游改制的行恰好被上游重写**时（探针 D）。
+3. **因此"补丁要小、单文件、按文件聚合"是硬要求**：补丁越小、越集中在一处，上游重写该处的概率才可评估；
+   大段改写必然长期冲突。
+4. **本次上游区间实际触碰了 4 个"补丁候选文件"**：
+   `tradingagents/reporting.py`、`tradingagents/agents/tools.py`、`tradingagents/graph/trading_graph.py`、
+   `tradingagents/dataflows/date_window.py`。
+   其中 `reporting.py`（P4）与 `agents/tools.py`（P5）正是草案补丁的目标 → **打这两个补丁时必须准备 rebase**；
+   而 `dataflows/router.py`（P1）、`graph/setup.py` + `graph/analyst_execution.py`（P2）、
+   `agents/state.py`、`default_config.py` 本次**未被上游改动** → 补丁落在这几个文件上，冲突概率最低。
+5. **首次真同步（fork 建立后）仍应按第 3 节全流程走一遍**：本次演练没有推送、没有打 tag，
+   也没有 `origin` 可推（见第 0 节）。
 
 ---
 
