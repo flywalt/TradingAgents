@@ -50,9 +50,10 @@
 | --- | --- | --- | --- | --- | --- | --- |
 | D-0001 | `ffab0e2` `docs(governance)` | docs | 建立 `AGENTS.md` + `docs/` 四份规范（本文件、`UPSTREAM_SYNC.md`、`ARCHITECTURE.md`、`EXTENSION_POINTS.md`） | 无（纯新增 5 个文件） | 无 | 不涉及代码，跑全量测试确认无副作用（1412 passed） |
 | D-0002 | `d733340` `docs(sync)` | docs | 回填 rebase 演练结果、冲突探测结论与提交哈希 | 无 | 无 | 同上 |
-| D-0003 | 本条提交 `feat(downstream)` | feat | 下游骨架 `tradingagents_cn/`（注册/配置/代码规范化/交易日历/交易规则/适配器公共层）+ `tests/downstream/` 110 个测试（含**同步保险丝**） | 无 | 无 | 全量 `1522 passed, 1 skipped`；`ruff check .` 全绿 |
+| D-0003 | `7d626cd` `feat(downstream)` | feat | 下游骨架 `tradingagents_cn/`（注册/配置/代码规范化/交易日历/交易规则/适配器公共层）+ `tests/downstream/` 110 个测试（含**同步保险丝**） | 无 | 无 | 全量 `1522 passed, 1 skipped`；`ruff check .` 全绿 |
+| D-0004 | 本条提交 `feat(tushare)` | feat | Tushare 行情 vendor（`get_stock_data`，含 `cn_adjust` 复权）+ `trade_cal` 交易日历 + `docs/TUSHARE.md` + 16 个离线测试 + 2 个 `integration` 冒烟 | 无 | 无 | 全量 `1538 passed, 1 skipped`；integration 需 `TUSHARE_TOKEN` |
 
-三条下游提交合计新增代码与文档，**0 行上游改动**。下游与上游的唯一耦合是文档里登记的"脆弱耦合"，
+四条下游提交合计新增代码与文档，**0 行上游改动**。下游与上游的唯一耦合是文档里登记的"脆弱耦合"，
 现在由 `tests/downstream/test_sync_guard.py`（12 组断言）机械锁定。
 
 ### 2.1 已实现的下游文件（D-0003）
@@ -65,6 +66,7 @@
 | `tradingagents_cn/calendar.py` | 交易日历（周末 + 可注入节假日），`set_default_calendar()` 供 vendor 安装真实日历 |
 | `tradingagents_cn/trading_rules.py` | 涨跌停比例与限价（Decimal 半进位）、整手规则、T+1 交收 |
 | `tradingagents_cn/vendors/common.py` | 适配器公共层：`require_ashare` / `require_token` / `adjustment` / `no_rows` |
+| `tradingagents_cn/vendors/tushare/` | 行情 vendor：`stock.py`（日线 + `cn_adjust` 复权、手/千元→股/元）、`calendar.py`（`trade_cal` → 交易日历）、`client.py`（惰性鉴权 + 可注入假客户端） |
 | `tests/downstream/test_sync_guard.py` | 脆弱耦合保险丝（router 表、错误类型、state key、agent 工厂、图注入点、评级、报告、provider） |
 
 > 目前**没有任何上游代码修改**（无 `upstream-patch:` 提交）。这是有意的：本阶段的结论是

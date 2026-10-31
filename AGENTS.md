@@ -13,6 +13,7 @@
 | `docs/EXTENSION_POINTS.md` | 扩展点审查报告：哪些能力零改动可实现、哪些必须打补丁 |
 | `docs/UPSTREAM_DELTA.md` | 基线记录 + 下游差异台账（每个下游提交都要登记） |
 | `docs/UPSTREAM_SYNC.md` | 上游同步（rebase）标准流程与演练记录 |
+| `docs/TUSHARE.md` | A 股数据接入：行情/复权/交易日历、单位口径、路由回退、已知限制 |
 
 ---
 
