@@ -41,7 +41,7 @@ def test_override_installs_the_chain_over_base_values():
 
 def test_vendor_chain_only_touches_categories_downstream_serves():
     category_chain = cn_config.vendor_chain()
-    assert list(category_chain) == ["core_stock_apis"]
+    assert list(category_chain) == ["core_stock_apis", "technical_indicators", "fundamental_data"]
 
 
 def test_env_overrides_beat_defaults_and_base():
@@ -89,3 +89,45 @@ def test_apply_lets_the_caller_override_anything():
 def test_apply_can_skip_the_vendor_chain():
     merged = cn_config.apply(install_vendor_chain=False)
     assert merged["data_vendors"]["core_stock_apis"] == "yfinance"
+
+
+# --- strict A-share mode ---------------------------------------------------
+
+
+def test_default_mode_installs_the_fallback_chain_for_every_served_category():
+    merged = cn_config.apply()
+
+    assert merged["data_vendors"]["core_stock_apis"] == "tushare,yfinance"
+    assert merged["data_vendors"]["technical_indicators"] == "tushare,yfinance"
+    assert merged["data_vendors"]["fundamental_data"] == "tushare,yfinance"
+
+
+def test_strict_mode_installs_single_vendor_chains():
+    merged = cn_config.apply({"cn_strict_ashare": True})
+
+    assert merged["data_vendors"]["core_stock_apis"] == "tushare"
+    assert merged["data_vendors"]["technical_indicators"] == "tushare"
+    assert merged["data_vendors"]["fundamental_data"] == "tushare"
+    # Categories downstream does not serve keep upstream's own choice.
+    assert merged["data_vendors"]["news_data"] == "yfinance"
+
+
+def test_strict_mode_can_come_from_the_environment():
+    merged = cn_config.apply(environ={"TRADINGAGENTS_CN_STRICT_ASHARE": "1"})
+
+    assert merged["cn_strict_ashare"] is True
+    assert merged["data_vendors"]["technical_indicators"] == "tushare"
+
+
+def test_an_explicit_vendor_choice_beats_the_strict_chain():
+    merged = cn_config.apply(
+        {"cn_strict_ashare": True, "data_vendors": {"technical_indicators": "yfinance"}}
+    )
+
+    assert merged["data_vendors"]["technical_indicators"] == "yfinance"
+    assert merged["data_vendors"]["core_stock_apis"] == "tushare"
+
+
+def test_an_invalid_strict_flag_fails_at_startup():
+    with pytest.raises(ValueError, match="TRADINGAGENTS_CN_STRICT_ASHARE"):
+        cn_config.apply(environ={"TRADINGAGENTS_CN_STRICT_ASHARE": "maybe"})

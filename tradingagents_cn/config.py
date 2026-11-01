@@ -34,6 +34,10 @@ DEFAULT_CN_CONFIG: dict = {
     "cn_calendar_holidays": (),
     #: Whether Beijing Stock Exchange symbols are in scope.
     "cn_include_bj": True,
+    #: Strict A-share mode: chains become Tushare-only, so a Tushare outage is
+    #: reported as unavailable instead of silently served from Yahoo (a
+    #: different price basis). Off by default so US tickers keep working.
+    "cn_strict_ashare": False,
 }
 
 #: Ordered vendor chain installed per data category. Only the categories the
@@ -41,12 +45,15 @@ DEFAULT_CN_CONFIG: dict = {
 #: upstream's own default, so unrelated data paths are unaffected.
 VENDOR_CHAIN_DEFAULTS: dict[str, tuple[str, ...]] = {
     "core_stock_apis": ("tushare", "yfinance"),
+    "technical_indicators": ("tushare", "yfinance"),
+    "fundamental_data": ("tushare", "yfinance"),
 }
 
 _ENV_OVERRIDES = {
     "TRADINGAGENTS_CN_MARKET": "cn_market",
     "TRADINGAGENTS_CN_ADJUST": "cn_adjust",
     "TRADINGAGENTS_CN_INCLUDE_BJ": "cn_include_bj",
+    "TRADINGAGENTS_CN_STRICT_ASHARE": "cn_strict_ashare",
 }
 
 _TRUE = ("true", "1", "yes", "on")
@@ -90,9 +97,18 @@ def env_overrides(environ: dict | None = None) -> dict:
     return overlay
 
 
-def vendor_chain(categories: dict[str, tuple[str, ...]] | None = None) -> dict:
-    """A ``data_vendors`` fragment for the categories downstream vendors serve."""
+def vendor_chain(
+    categories: dict[str, tuple[str, ...]] | None = None, *, strict: bool = False
+) -> dict:
+    """A ``data_vendors`` fragment for the categories downstream vendors serve.
+
+    ``strict`` keeps only the first (A-share) vendor of each chain, so a Tushare
+    failure surfaces as unavailable data rather than as a silent switch to a
+    different price basis.
+    """
     chosen = VENDOR_CHAIN_DEFAULTS if categories is None else categories
+    if strict:
+        chosen = {category: vendors[:1] for category, vendors in chosen.items()}
     return {category: ",".join(vendors) for category, vendors in chosen.items()}
 
 
@@ -115,18 +131,17 @@ def build_config(
     for key, value in DEFAULT_CN_CONFIG.items():
         merged.setdefault(key, deepcopy(value))
 
+    merged.update(env_overrides(environ))
+    _validate(merged)
+
     if install_vendor_chain:
         vendors = merged.get("data_vendors")
         if not isinstance(vendors, dict):
             vendors = merged["data_vendors"] = {}
-        for category, chain in vendor_chain().items():
-            if override_vendor_chain:
-                vendors[category] = chain
-            else:
-                vendors.setdefault(category, chain)
-
-    merged.update(env_overrides(environ))
-    _validate(merged)
+        chain = vendor_chain(strict=bool(merged.get("cn_strict_ashare")))
+        for category, chain_value in chain.items():
+            if override_vendor_chain or category not in vendors:
+                vendors[category] = chain_value
     return merged
 
 
@@ -149,22 +164,38 @@ def apply(
     ``TRADINGAGENTS_CN_*`` env vars, ``overrides``. The result is always a full
     config (upstream keys included), so it can go straight into
     ``TradingAgentsGraph(config=...)``.
+
+    Vendor chains are installed last, from the *final* ``cn_strict_ashare``, and
+    skip any category the caller set explicitly — a caller who chose a vendor
+    must not be overridden by a mode flag.
     """
     from tradingagents.default_config import DEFAULT_CONFIG
 
-    merged = build_config(
-        DEFAULT_CONFIG,
-        environ=environ,
-        install_vendor_chain=install_vendor_chain,
-        # Upstream's ``data_vendors`` values are defaults, not a user's choice,
-        # so the downstream A-share chain replaces them; ``overrides`` below
-        # still wins over both.
-        override_vendor_chain=True,
-    )
-    for key, value in deepcopy(overrides or {}).items():
-        if isinstance(value, dict) and isinstance(merged.get(key), dict):
-            merged[key].update(value)
-        else:
-            merged[key] = value
+    explicit = deepcopy(overrides or {})
+    merged = deepcopy(DEFAULT_CONFIG)
+    for key, value in DEFAULT_CN_CONFIG.items():
+        merged.setdefault(key, deepcopy(value))
+    merged.update(env_overrides(environ))
+    merged = _overlay(merged, explicit)
     _validate(merged)
+
+    if install_vendor_chain:
+        vendors = merged.get("data_vendors")
+        if not isinstance(vendors, dict):
+            vendors = merged["data_vendors"] = {}
+        chosen = explicit.get("data_vendors") or {}
+        chain = vendor_chain(strict=bool(merged.get("cn_strict_ashare")))
+        for category, chain_value in chain.items():
+            if category not in chosen:
+                vendors[category] = chain_value
     return merged
+
+
+def _overlay(base: dict, overlay: dict) -> dict:
+    """Merge ``overlay`` into ``base``: dict values one level deep, scalars replace."""
+    for key, value in overlay.items():
+        if isinstance(value, dict) and isinstance(base.get(key), dict):
+            base[key].update(deepcopy(value))
+        else:
+            base[key] = value
+    return base
