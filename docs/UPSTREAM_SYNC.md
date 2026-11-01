@@ -292,3 +292,35 @@ comm -12 <(git diff --name-only v0.7.0..upstream/main | sort) \
 - [ ] 全量测试全绿，结果记入 commit message
 - [ ] 打 `sync/YYYYMMDD` 标签
 - [ ] 备份分支已删除（或明确保留原因）
+
+---
+
+## 8. 治理规则 v2（2026-11-01）
+
+上一节的流程仍然有效，本节把评审提出的九条规则固化下来；`scripts/sync_upstream.sh` 是它的可执行版本。
+
+| # | 规则 | 落地方式 |
+| --- | --- | --- |
+| 1 | 生产分支跟随**官方 Release Tag** | 同步目标永远是 `vX.Y.Z` 标签，不是 `upstream/main` |
+| 2 | `upstream/main` 仅用于**预览与提前兼容检查** | `git log main..upstream/main` 可以看，不能 rebase 到它 |
+| 3 | 每次同步建**独立 sync 分支** | `sync/<tag>`，失败即丢弃，不污染 `main` |
+| 4 | 同步前建**不可变备份 Tag** | `backup/pre-sync-<tag>-<时间戳>`（annotated tag，指向同步前 `main`） |
+| 5 | Rebase 后运行**全部测试** | `uv run pytest -q` + `ruff check .`，任一失败不晋级 |
+| 6 | 成功后更新**上游基线** | 脚本写 `docs/UPSTREAM_BASE.md` 并单独提交 |
+| 7 | 每个稳定版本打**下游 Tag** | `downstream-vX.Y.Z`（可选参数 `--version`） |
+| 8 | 未通过测试**不得晋级 production** | 脚本失败路径直接退出，`main` 不动 |
+| 9 | 避免多人同时推送；rebase 后**force-with-lease** | 脚本不自动推送，只打印命令；由人确认无并发推送后执行 |
+
+使用：
+
+```bash
+git fetch upstream --tags
+scripts/sync_upstream.sh v0.7.2            # 只演练，不推送
+scripts/sync_upstream.sh v0.7.2 --version 0.2.0   # 同时打 downstream-v0.2.0
+```
+
+失败时：`git rebase --abort && git switch main && git branch -D sync/<tag>`，备份 tag 保留。
+
+**为什么坚持 rebase 而不是 merge**：下游提交保持线性，`git log --oneline main` 读起来就是"上游基线 + 我们的补丁序列"，出问题时能逐条 revert；merge 会把上游历史织进 `main`，`upstream-patch:` 提交的位置也就不可枚举了。
+
+> 注意：本仓库当前 `main` 已经领先 `origin/main`（本地提交），**首次使用该脚本前先把本地 `main` 与远端对齐**，否则 `force-with-lease` 会因远端引用过期而失败。
