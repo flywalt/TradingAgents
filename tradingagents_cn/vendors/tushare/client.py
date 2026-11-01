@@ -13,7 +13,9 @@ logged, written to a report, or echoed in an error message.
 
 from __future__ import annotations
 
+import os
 import threading
+import time
 
 from tradingagents.dataflows.errors import VendorNotConfiguredError
 from tradingagents_cn.vendors.common import require_token
@@ -23,6 +25,37 @@ TOKEN_ENV = "TUSHARE_TOKEN"
 
 _lock = threading.Lock()
 _api = None
+_last_call: float | None = None
+
+#: Seconds between real calls, the safe rate for a 2000-point account.
+DEFAULT_MIN_INTERVAL = 0.15
+
+
+def min_interval() -> float:
+    """Seconds to leave between calls (``TRADINGAGENTS_CN_MIN_INTERVAL``, default 0.15)."""
+    raw = os.environ.get("TRADINGAGENTS_CN_MIN_INTERVAL")
+    if raw is None or not raw.strip():
+        return DEFAULT_MIN_INTERVAL
+    try:
+        value = float(raw)
+    except ValueError as exc:
+        raise ValueError(
+            f"TRADINGAGENTS_CN_MIN_INTERVAL must be a number of seconds, got {raw!r}"
+        ) from exc
+    if value < 0:
+        raise ValueError(f"TRADINGAGENTS_CN_MIN_INTERVAL cannot be negative, got {value}")
+    return value
+
+
+def throttle() -> None:
+    """Sleep so two calls are at least ``min_interval()`` apart."""
+    global _last_call
+    interval = min_interval()
+    if interval and _last_call is not None:
+        remaining = interval - (time.monotonic() - _last_call)
+        if remaining > 0:
+            time.sleep(remaining)
+    _last_call = time.monotonic()
 
 
 class TushareApi:
@@ -35,10 +68,12 @@ class TushareApi:
         """Adjusted/unadjusted daily bars (``ts.pro_bar``, which also needs ``api``)."""
         import tushare as ts
 
+        throttle()
         return ts.pro_bar(api=self._pro, **kwargs)
 
     def trade_cal(self, **kwargs):
         """The exchange calendar (``pro.trade_cal``)."""
+        throttle()
         return self._pro.trade_cal(**kwargs)
 
 
