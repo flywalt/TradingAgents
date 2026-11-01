@@ -1,0 +1,5 @@
+# Downstream-only dependencies. Not in upstream's pyproject.toml on purpose:
+# adding them there would be a permanent rebase conflict for a dependency the
+# upstream project does not need. Install with:
+#   uv pip install -r requirements-downstream.txt
+tushare>=1.4.29
