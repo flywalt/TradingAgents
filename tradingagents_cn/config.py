@@ -204,6 +204,7 @@ def apply(
     *,
     environ: dict | None = None,
     install_vendor_chain: bool = True,
+    profile=None,
 ) -> dict:
     """Downstream config over upstream's ``DEFAULT_CONFIG``, with ``overrides`` on top.
 
@@ -218,24 +219,47 @@ def apply(
     must not be overridden by a mode flag.
     """
     from tradingagents.default_config import DEFAULT_CONFIG
+    from tradingagents_cn.market import CN_A_SHARE, get_profile
 
+    chosen = get_profile(profile) if isinstance(profile, str) else (profile or CN_A_SHARE)
     explicit = deepcopy(overrides or {})
     merged = deepcopy(DEFAULT_CONFIG)
     for key, value in DEFAULT_CN_CONFIG.items():
         merged.setdefault(key, deepcopy(value))
     merged = _overlay(merged, explicit)
     merged.update(env_overrides(environ))
+    merged["cn_market_profile"] = chosen.key
+    if not chosen.strict_allowed and merged.get("cn_strict_ashare"):
+        raise ValueError(
+            f"cn_strict_ashare is an A-share vendor policy; profile {chosen.key} forbids it"
+        )
+    if "cn_indicator_flavor" not in explicit and "TRADINGAGENTS_CN_INDICATOR_FLAVOR" not in (environ or {}):
+        merged["cn_indicator_flavor"] = chosen.indicator_flavor
     _validate(merged)
 
-    if install_vendor_chain:
+    if install_vendor_chain and chosen.vendors:
         vendors = merged.get("data_vendors")
         if not isinstance(vendors, dict):
             vendors = merged["data_vendors"] = {}
-        chosen = explicit.get("data_vendors") or {}
+        explicit_vendors = explicit.get("data_vendors") or {}
         chain = vendor_chain(strict=bool(merged.get("cn_strict_ashare")))
         for category, chain_value in chain.items():
-            if category not in chosen:
+            if category not in explicit_vendors:
                 vendors[category] = chain_value
+    if not merged.get("cn_strict_ashare"):
+        # Profile defaults only; strict mode below sets every managed tool itself.
+        for method, chain_value in chosen.tool_vendors.items():
+            merged.setdefault("tool_vendors", {}).setdefault(method, chain_value)
+    if chosen.dir_suffix:
+        suffix = chosen.dir_suffix
+        if "results_dir" not in explicit:
+            merged["results_dir"] = os.path.join(str(merged["results_dir"]), f"profile-{suffix}")
+        if "data_cache_dir" not in explicit:
+            merged["data_cache_dir"] = os.path.join(str(merged["data_cache_dir"]), f"profile-{suffix}")
+        if "memory_log_path" not in explicit:
+            merged["memory_log_path"] = str(merged["memory_log_path"]).replace(
+                ".md", f"-{suffix}.md"
+            )
 
     if merged.get("cn_strict_ashare"):
         _enforce_strict_tool_vendors(merged)

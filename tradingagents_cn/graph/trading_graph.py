@@ -56,12 +56,13 @@ class CnTradingAgentsGraph(TradingAgentsGraph):
         self, ticker: str, asset_type: str = "stock", trade_date: str | None = None
     ) -> str:
         """Identity context for ``ticker``; same signature and contract as upstream."""
-        identity = self._ashare_identity(ticker, trade_date)
+        cn_profile = self.config.get("cn_market_profile") == "CN_A_SHARE"
+        identity = self._ashare_identity(ticker, trade_date) if cn_profile else {}
         if identity:
             context = build_instrument_context(ticker, asset_type, identity, trade_date)
         else:
             context = super().resolve_instrument_context(ticker, asset_type, trade_date)
-        if is_ashare(ticker):
+        if cn_profile and is_ashare(ticker):
             context += _trading_constraints(ticker)
         return context
 

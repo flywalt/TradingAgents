@@ -49,7 +49,12 @@ def _instantiates_upstream_graph(path: Path) -> bool:
     return False
 
 
-def test_no_downstream_module_instantiates_the_upstream_graph():
+def test_no_module_writes_a_direct_upstream_constructor_call():
+    """The factory selects the class by profile; nothing else may hardcode it.
+
+    The factory reaches the upstream class through a variable, so this scan sees
+    no literal call — the behavioural guarantee lives in test_market_profiles.py.
+    """
     offenders = [
         str(path.relative_to(PACKAGE))
         for path in PACKAGE.rglob("*.py")

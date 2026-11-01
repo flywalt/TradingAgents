@@ -41,6 +41,8 @@ def _base_config(args) -> dict:
 def analyze(args) -> int:
     graph = graph_factory.build_graph(
         cn_config.apply(_base_config(args)),
+        market=args.market,
+        symbol=args.ticker,
         selected_analysts=args.analysts,
     )
     state, rating = graph.propagate(args.ticker, args.date)
@@ -57,6 +59,7 @@ def batch(args) -> int:
         tickers=args.tickers,
         dates=args.dates,
         config=_base_config(args),
+        market=args.market,
         selected_analysts=args.analysts,
     )
     failures = 0
@@ -78,7 +81,9 @@ def build_parser() -> argparse.ArgumentParser:
                         default=_analysts(DEFAULT_ANALYSTS),
                         help="comma separated analyst keys")
     common.add_argument("--strict", action="store_true",
-                        help="Tushare-only chains: fail rather than serve another basis")
+                        help="Tushare-only chains (CN_A_SHARE only)")
+    common.add_argument("--market",
+                        help="market code (CN/HK/US/...); inferred from the symbol when omitted")
     common.add_argument("--output", help="results directory override")
 
     single = sub.add_parser("analyze", parents=[common], help="run one ticker/date")

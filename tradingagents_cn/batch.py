@@ -30,6 +30,7 @@ def run_batch(
     dates: Iterable[str],
     *,
     config: dict | None = None,
+    market: str | None = None,
     selected_analysts: Sequence[str] = ("market", "social", "news", "fundamentals"),
     on_result=None,
 ) -> list[BatchResult]:
@@ -45,7 +46,10 @@ def run_batch(
         for trade_date in dates:
             try:
                 graph = graph_factory.build_graph(
-                    settings, selected_analysts=tuple(selected_analysts)
+                    settings,
+                    market=market,
+                    symbol=ticker,
+                    selected_analysts=tuple(selected_analysts),
                 )
                 state, rating = graph.propagate(ticker, trade_date)
                 path = graph.save_reports(state, ticker)
