@@ -14,6 +14,8 @@
 | `docs/UPSTREAM_DELTA.md` | 基线记录 + 下游差异台账（每个下游提交都要登记） |
 | `docs/UPSTREAM_SYNC.md` | 上游同步（rebase）标准流程与演练记录 |
 | `docs/TUSHARE.md` | A 股数据接入：行情/复权/交易日历、单位口径、路由回退、已知限制 |
+| `docs/ASHARE_DATA.md` | A 股数据层能力矩阵、价格/指标口径、缓存限流、限制清单 |
+| `docs/AGENT_MAP.md` | Agent 层地图：12 个节点的输入/工具/A 股可达性 + B1/B2/B3 批次计划 |
 
 ---
 
