@@ -76,6 +76,7 @@
 | `tests/downstream/test_concurrency.py` | 双链并发隔离 |
 | `tests/downstream/test_graph_wiring.py` | 身份注入 12/12、PIT、规则注入、签名一致 |
 | `tests/downstream/test_prompt_contracts.py` | **捕获真实 prompt**：身份/规则进入、美股无 A 股规则 |
+| `tests/downstream/test_prompt_scenarios.py` | 黄金场景（工具真调用）：无数据哨兵、亏损带符号、涨停带幅度 |
 | `tests/downstream/test_checkpoint_behavior.py` | 版本/口径/脏工作区使 checkpoint 失效 |
 | `tests/downstream/test_run_metadata.py` | 11 项元数据三处渲染 |
 | `tests/downstream/test_snapshot_routing.py` | 快照路由、契约不变、同源一致 |
