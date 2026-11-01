@@ -73,7 +73,49 @@ def resolve_identity_at(symbol: str, as_of: str) -> dict:
         return {}
     identity["exchange"] = _EXCHANGE.get(symbol.split(".")[-1].upper(), "")
     identity["identity_as_of"] = _compact(as_of)
+    historical = _historical_name(identity["ts_code"], _compact(as_of))
+    if historical:
+        identity["name"] = historical
+        identity["name_source"] = "namechange"
+    else:
+        identity["name_source"] = "stock_basic"
     return identity
+
+
+def _historical_name(symbol: str, as_of_compact: str) -> str | None:
+    """The name that was both in force and public on ``as_of``.
+
+    Tushare's ``stock_basic`` serves today's name; ``namechange`` carries the
+    history. A row is usable only when it was announced by the run date *and* its
+    effective window covers that date: a rename announced on 05-03 but effective
+    05-01 was not yet public on 05-02.
+    """
+    try:
+        frame = cached(
+            "namechange",
+            symbol,
+            _TTL_SECONDS,
+            lambda: client.get_api().namechange(ts_code=symbol),
+        )
+    except Exception:  # noqa: BLE001 - identity is best-effort, like upstream's
+        return None
+    if frame is None or len(frame) == 0 or "name" not in frame.columns:
+        return None
+
+    best_name, best_start = None, ""
+    for row in frame.to_dict("records"):
+        start = _compact(row.get("start_date"))
+        end = _compact(row.get("end_date"))
+        announced = _compact(row.get("ann_date"))
+        if not start or (announced and announced > as_of_compact):
+            continue
+        if start > as_of_compact:
+            continue
+        if end and end < as_of_compact:
+            continue
+        if start >= best_start:
+            best_start, best_name = start, str(row.get("name") or "").strip() or None
+    return best_name
 
 
 def _compact(value: str) -> str:

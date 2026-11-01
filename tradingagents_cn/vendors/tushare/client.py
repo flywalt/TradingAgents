@@ -79,6 +79,10 @@ class TushareApi:
         """Company profile: name, industry, area, board, listing date."""
         return self._call("stock_basic", **kwargs)
 
+    def namechange(self, **kwargs):
+        """Historical name changes with effective and announcement dates."""
+        return self._call("namechange", **kwargs)
+
     def daily_basic(self, **kwargs):
         """Valuation and trading snapshot for a session (PE/PB/PS/市值/换手)."""
         return self._call("daily_basic", **kwargs)

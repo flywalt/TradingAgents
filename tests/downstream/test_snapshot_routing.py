@@ -115,3 +115,26 @@ def test_a_vendor_failure_keeps_the_tools_sentinel_semantics(monkeypatch, offlin
 
     assert text.startswith("DATA_UNAVAILABLE")
     assert "down" in text
+
+
+def test_the_snapshot_matches_the_price_tool_on_the_same_session(offline):
+    from tradingagents.dataflows.router import route_to_vendor
+
+    with run_config({"data_vendors": {"core_stock_apis": "tushare"}}):
+        snapshot = get_verified_market_snapshot.func(SYMBOL, "2026-02-27", 20, "")
+        bars = route_to_vendor("get_stock_data", SYMBOL, "2026-01-05", "2026-02-27")
+
+    bar_rows = [line.split(",") for line in bars.splitlines() if line and line[0].isdigit()]
+    snapshot_rows = [line for line in snapshot.splitlines() if line.startswith("20")]
+    snapshot_close = snapshot_rows[0].split(",")[4]
+
+    assert bar_rows[-1][0] == "2026-02-27"
+    assert bar_rows[-1][4] == snapshot_close
+
+
+def test_the_snapshot_never_serves_bars_after_the_run_date(offline):
+    with run_config({"data_vendors": {"core_stock_apis": "tushare"}}):
+        snapshot = get_verified_market_snapshot.func(SYMBOL, "2026-02-27", 20, "")
+
+    dates = [line.split(",")[0] for line in snapshot.splitlines() if line.startswith("20")]
+    assert dates and max(dates) <= "2026-02-27"

@@ -56,6 +56,9 @@ def _graph(tmp_path, **overrides):
         "memory_log_path": str(tmp_path / "memory.md"),
         "llm_provider": "openai",
         "checkpoint_enabled": True,
+        # The test suite runs from a possibly-dirty tree; the dirty guard has its
+        # own two tests below.
+        "cn_allow_dirty_checkpoint": True,
         **overrides,
     })
     return build_graph(config=cfg)
@@ -99,3 +102,21 @@ def test_the_extension_version_reaches_the_run_config(tmp_path):
 
     assert graph.config["cn_extension_version"]
     assert "cn_extension_version" in graph.config
+
+
+def test_a_dirty_worktree_refuses_resumable_checkpoints(tmp_path, monkeypatch):
+    from tradingagents_cn.graph import factory as graph_factory
+
+    monkeypatch.setattr(graph_factory, "worktree_dirty", lambda: True)
+    with pytest.raises(RuntimeError, match="uncommitted worktree"):
+        _graph(tmp_path, cn_allow_dirty_checkpoint=False)
+
+
+def test_the_dirty_guard_can_be_lifted_for_development(tmp_path, monkeypatch):
+    from tradingagents_cn.graph import factory as graph_factory
+
+    monkeypatch.setattr(graph_factory, "worktree_dirty", lambda: True)
+
+    graph = _graph(tmp_path, cn_allow_dirty_checkpoint=True)
+
+    assert graph.config["cn_allow_dirty_checkpoint"] is True

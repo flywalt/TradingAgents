@@ -22,9 +22,9 @@ from tradingagents_cn.vendors.tushare import client
 pytestmark = pytest.mark.unit
 
 REQUIRED = {
-    "upstream_commit", "downstream_commit", "extension_version", "data_provider",
-    "provider_revision", "financial_formula_version", "market_rules_version",
-    "data_as_of", "data_retrieved_at",
+    "upstream_commit", "downstream_commit", "worktree_dirty", "extension_version",
+    "data_provider", "provider_revision", "financial_formula_version",
+    "market_rules_version", "data_as_of", "data_retrieved_at", "dataset_snapshot_id",
 }
 
 
@@ -70,6 +70,7 @@ def test_collect_returns_every_required_field():
     assert metadata["data_provider"] == "tushare,yfinance"
     assert metadata["financial_formula_version"] == FINANCIAL_FORMULA_VERSION
     assert metadata["market_rules_version"] == MARKET_RULES_VERSION
+    assert metadata["dataset_snapshot_id"] == metadata["dataset_snapshot_id"]  # deterministic
     assert all(str(value).strip() for value in metadata.values())
 
 

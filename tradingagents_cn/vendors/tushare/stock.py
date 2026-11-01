@@ -70,7 +70,10 @@ def fetch_bars(
     if frame is None or len(frame) == 0:
         raise no_rows(symbol, canonical, f"tushare returned no bars between {start} and {end}")
 
-    return _normalize(frame)
+    data = _normalize(frame)
+    # Defensive: a vendor that ignores end_date must not leak bars past the run
+    # date into an indicator or snapshot window.
+    return data[data["trade_date"] <= end].reset_index(drop=True)
 
 
 def get_stock_data(symbol: str, start_date: str, end_date: str) -> str:

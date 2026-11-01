@@ -60,14 +60,14 @@ class CnTradingAgentsGraph(TradingAgentsGraph):
             return super().resolve_instrument_context(ticker, asset_type, trade_date)
         return build_instrument_context(ticker, asset_type, identity, trade_date)
 
-    def run_metadata(self, trade_date: str) -> dict:
+    def run_metadata(self, trade_date: str, ticker: str | None = None) -> dict:
         """Provenance for this run (also attached to every saved report)."""
-        return collect_run_metadata(self.config, trade_date)
+        return collect_run_metadata(self.config, trade_date, ticker)
 
     def save_reports(self, final_state, ticker, save_path=None, html=True):
         """Upstream's report tree, plus the downstream provenance block."""
         path = super().save_reports(final_state, ticker, save_path=save_path, html=html)
-        metadata = self.run_metadata(str(final_state.get("trade_date") or ""))
+        metadata = self.run_metadata(str(final_state.get("trade_date") or ""), ticker)
         attach_run_metadata(path, metadata)
         return path
 
