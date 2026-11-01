@@ -75,6 +75,9 @@
 | D-0025 | `64e537a` `feat(report)` | feat | 9 项运行元数据写入 md/json/html | 无 | 无 | 3 passed |
 | D-0026 | `e1ee43d` `chore(sync)` | chore | 同步治理 v2 + `scripts/sync_upstream.sh` + `docs/UPSTREAM_BASE.md` | 无 | 无 | 脚本语法检查 |
 | D-0027 | 本条提交 `upstream-patch(test)` | **上游补丁** | 端到端测试的『实际数据路径』断言跟随快照路由（2 行） | `tests/test_graph_end_to_end.py` | 低：一处集合字面量 | 上游全量 1654 passed |
+| D-0028 | `211c690` `refactor(core)` | refactor | P0 修订：`bootstrap()` 与运行配置分离、自建 CLI/Batch、严格模式锁 `tool_vendors`、真实并发隔离测试 | 无 | 无 | 1675 passed |
+| D-0029 | `06b7940` `feat(roi)` | feat | P1 修订：`namechange` PIT 名称、快照与行情同源校验、脏工作区禁止 checkpoint、元数据 11 字段 | 无 | 无 | 1675 passed |
+| D-0030 | 本条提交 `docs(extension)` | docs | 扩展架构 v2.1 重写（层级按实际侵入性、兼容性表述、并发矩阵、严格模式、入口规则、L4a 取消行数门槛） | 无 | 无 | 不涉及代码 |
 
 十余条下游提交合计新增代码与文档，**0 行上游改动**。下游与上游的唯一耦合是文档里登记的"脆弱耦合"，
 现在由 `tests/downstream/test_sync_guard.py`（12 组断言）机械锁定。

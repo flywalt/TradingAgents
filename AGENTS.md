@@ -97,6 +97,21 @@ docs/                  # 下游文档（本套规范）
 - 数据源（Tushare/AkShare/交易所官网等）均有速率限制与授权条款，token 只放 `.env`，
   不写入仓库、不写入日志、不写入报告。
 
+## 5.1 入口规则（v2.1）
+
+**生产入口只有下游的这三条**，它们都经过 `build_graph()`（注册 + 配置隔离 + 身份解析 + 元数据）：
+
+```bash
+python -m tradingagents_cn.cli analyze --ticker 600519.SH --date 2026-10-30 [--strict]
+python -m tradingagents_cn.cli batch --tickers 600519.SH,000001.SZ --dates 2026-10-30
+python -c "from tradingagents_cn.graph.factory import build_graph; ..."
+```
+
+- 禁止用上游 `cli/`（`python main.py` / `tradingagents` console script）或 `tradingagents/backtest.py` 跑生产任务：
+  它们直接构造 `TradingAgentsGraph`，绕过注册与 A 股身份。
+- `tests/downstream/test_entrypoints.py` 用 AST 扫描禁止下游新增直连上游 Graph 的代码。
+- 注册（`bootstrap()`）与运行配置（`build_graph(config)`）是两件事：前者进程级一次，后者每图一份。
+
 ## 6. 测试与验证
 
 ```bash
