@@ -26,6 +26,7 @@ _BUILTIN_MODULES = ("tradingagents_cn.vendors.tushare",)
 _REGISTERED: dict[tuple[str, str], object] = {}
 # Methods and category entries this module created, so reset() can remove them.
 _CREATED_METHODS: set[str] = set()
+_CREATED_CATEGORIES: list[str] = []
 _CREATED_CATEGORY_ENTRIES: list[tuple[str, str]] = []
 _ACTIVATED = False
 
@@ -56,6 +57,23 @@ def _router():
     from tradingagents.dataflows import router
 
     return router
+
+
+def register_category(name: str, description: str) -> bool:
+    """Create a router category so new downstream methods have a home.
+
+    Returns ``False`` when the category already exists (idempotent), so
+    activation can call it on every run.
+    """
+    router = _router()
+    if not isinstance(name, str) or not name.strip():
+        raise ValueError("category name must be a non-empty string")
+    name = name.strip().lower()
+    if name in router.TOOLS_CATEGORIES:
+        return False
+    router.TOOLS_CATEGORIES[name] = {"description": description, "tools": []}
+    _CREATED_CATEGORIES.append(name)
+    return True
 
 
 def register_vendor(
@@ -160,11 +178,14 @@ def reset() -> None:
         implementations = router.VENDOR_METHODS.get(method)
         if implementations is not None and not implementations:
             router.VENDOR_METHODS.pop(method, None)
+    for category in _CREATED_CATEGORIES:
+        router.TOOLS_CATEGORIES.pop(category, None)
     for category, method in _CREATED_CATEGORY_ENTRIES:
         tools = router.TOOLS_CATEGORIES.get(category, {}).get("tools")
         if tools is not None and method in tools:
             tools.remove(method)
     _REGISTERED.clear()
     _CREATED_METHODS.clear()
+    _CREATED_CATEGORIES.clear()
     _CREATED_CATEGORY_ENTRIES.clear()
     _ACTIVATED = False

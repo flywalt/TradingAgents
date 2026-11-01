@@ -1,0 +1,69 @@
+"""Deterministic A-share instrument identity.
+
+Upstream resolves a ticker's name and sector through Yahoo, which is thin for
+mainland listings. This reads the exchange's own ``stock_basic`` row instead.
+
+Data interface only: ``TradingAgentsGraph.resolve_instrument_context`` still
+calls the Yahoo path, because redirecting it is an agent-layer change. A later
+task can override that method and feed it ``format_identity``.
+"""
+
+from __future__ import annotations
+
+from tradingagents.dataflows.errors import VendorError, VendorUnavailableError
+from tradingagents_cn.cache import cached
+from tradingagents_cn.vendors.common import no_rows, require_ashare
+from tradingagents_cn.vendors.tushare import client
+
+_TTL_SECONDS = 24 * 60 * 60
+_FIELDS = "ts_code,name,area,industry,market,list_date"
+
+
+def resolve_identity(symbol: str) -> dict:
+    """``{ts_code, name, industry, area, market, list_date}`` for an A-share symbol."""
+    canonical = require_ashare(symbol)
+    try:
+        frame = cached(
+            "stock_basic",
+            canonical,
+            _TTL_SECONDS,
+            lambda: client.get_api().stock_basic(ts_code=canonical, fields=_FIELDS),
+        )
+    except VendorError:
+        raise
+    except Exception as exc:  # network, throttling, quota
+        raise VendorUnavailableError(f"tushare stock_basic unavailable: {exc}") from exc
+
+    if frame is None or len(frame) == 0:
+        raise no_rows(symbol, canonical, "no profile row for this symbol")
+
+    row = frame.iloc[0].to_dict()
+    return {
+        "ts_code": canonical,
+        "name": str(row.get("name") or "").strip() or canonical,
+        "industry": str(row.get("industry") or "").strip(),
+        "area": str(row.get("area") or "").strip(),
+        "market": str(row.get("market") or "").strip(),
+        "list_date": _iso_or_empty(row.get("list_date")),
+    }
+
+
+def format_identity(identity: dict) -> str:
+    """A one-line context string for a prompt, skipping fields that are empty."""
+    parts = [identity.get("ts_code", ""), identity.get("name", "")]
+    labels = (
+        ("industry", "行业"),
+        ("area", "地区"),
+        ("market", "板块"),
+        ("list_date", "上市"),
+    )
+    rendered = " ".join(part for part in parts if part)
+    details = [f"{label}: {identity[key]}" for key, label in labels if identity.get(key)]
+    return f"{rendered} | " + " | ".join(details) if details else rendered
+
+
+def _iso_or_empty(value) -> str:
+    text = str(value or "").strip()
+    if len(text) == 8 and text.isdigit():
+        return f"{text[:4]}-{text[4:6]}-{text[6:]}"
+    return text

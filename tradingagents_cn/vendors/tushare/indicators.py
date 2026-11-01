@@ -84,7 +84,7 @@ def get_stock_stats_indicators_window(
         lambda: fetch_bars(canonical, start, as_of, adjust=adjust),
     )
 
-    values = _indicator_series(bars, name)
+    values = indicator_series(bars, name)
     window = bars["trade_date"].tail(sessions)
     observed = values.tail(sessions)
 
@@ -99,7 +99,7 @@ def get_stock_stats_indicators_window(
     return "\n".join(lines) + "\n"
 
 
-def _indicator_series(bars: pd.DataFrame, name: str) -> pd.Series:
+def indicator_series(bars: pd.DataFrame, name: str) -> pd.Series:
     """The indicator over ``bars``, blanked where history is too short."""
     frame = pd.DataFrame(
         {
