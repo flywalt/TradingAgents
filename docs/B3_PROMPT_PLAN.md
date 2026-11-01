@@ -1,0 +1,55 @@
+# B3_PROMPT_PLAN.md — Prompt 本地化专题（先评测，后改）
+
+> 状态：待启动。前置：`docs/DATA_REQUIREMENTS.md` §7 的三个问题有答案（新闻粒度、情绪语义、宏观首批指标）。
+> 硬约束：**不修改上游 Analyst Prompt 文件**；B3 的所有改动走下游自有 agent 或上下文注入。
+
+## 1. 为什么先评测
+
+prompt 改动无法靠"读起来更专业"判断好坏。没有基线，改完之后：
+- 无法区分"结论变好"与"模型这次恰好这么写"；
+- 无法证伪"改坏了"——上游有 prompt 测试锁定文本性质，但不是效果测试。
+
+所以 B3 的顺序固定为：**评测骨架 → 基线数字 → 改一版 → 对比 → 保留或回退**。
+
+## 2. 评测骨架（第一步交付）
+
+复用上游 `tests/test_graph_end_to_end.py` 的手法：脚本化假模型 + 固定输入，捕获每个节点收到的 prompt 与状态流转。
+
+| 组件 | 内容 |
+| --- | --- |
+| 场景集 | 3~5 个黄金场景：**涨停板日**、**停牌/长期无成交**、**亏损财报**、**ST 股**、**除权日** |
+| 断言类型 | ① 数据事实进入 prompt（涨跌停幅度、T+1、口径声明）；② 缺失数据以"不可用"出现，而非被编造；③ 评级解析仍只产出 5 档 + `REVIEW`；④ 报告必含运行元数据 |
+| 基线 | 当前 12 个上游 prompt 在上述场景下的输出（脚本化模型下是确定性的，便于回归） |
+| 非目标 | 不评"结论对错"（需要真实市场结果），只评"是否按规则使用数据" |
+
+## 3. 参考：TradingAgents-CN 的 prompt / 框架改动
+
+核对来源：`hsliuping/TradingAgents-CN`（HEAD `51060a7`，v3.0），只读检查。
+
+| 他们做了什么 | 证据 | 对我们要不要借鉴 |
+| --- | --- | --- |
+| 新增 **China Market Analyst** 节点，按 `is_china/is_hk` 分支，取公司名、走 A 股工具 | `tradingagents/agents/analysts/china_market_analyst.py` | **部分借鉴**：A 股专属数据（资金面/涨跌停）确实需要一个自己的节点，但那属于 B2/后续 agent 专题，不是改 prompt |
+| **合规护栏**：`apply_compliance_guardrails()` 包装 prompt，避免读成投资建议 | `tradingagents/agents/utils/compliance_prompting.py`（被上述 analyst 调用） | **借鉴思路**：我们用上下文注入加一行合规约束即可，不必复制其实现 |
+| Prompt 外置为文件：`prompts/{zh,en}/{category}/{name}.txt`，带缓存加载器 | `core/prompts/loader.py` | **不复制**：仓库内 `prompts/` 实际只有邮件模板，说明这套加载器未落地；且外置会与上游 prompt 双轨 |
+| 新增 Index / Sector Analyst，多个分析角色 | `tradingagents/agents/analysts/index_analyst.py`、`sector_analyst.py` | **不照搬**：我们的路线是先保证 4 个现有分析师的 A 股数据正确，再加角色 |
+| 第二套"引擎"（planner / analyst registry / quality gate） | `core/agents/` | **不借鉴**：产品层复杂度，与上游同步模型冲突 |
+| 中文输出 | 各处中文 prompt 文本 | 我们已有 `output_language`，无需改 prompt 文件 |
+
+**结论**：CN 的 prompt 改动以"新增专属节点 + 合规包装 + 中文文本"为主，**没有可移植的 prompt 工程质量机制**（文件加载器未落地、无效果评测）。B3 不应复制其文本，只借鉴两个点：合规措辞、A 股专属节点思路。
+
+## 4. 我们打算改什么（待评测后决定，不是现在就改）
+
+候选（按收益/风险排序，均通过**下游上下文或自有 agent**实现）：
+
+1. **口径声明**：财报"本年累计/亿元/合并报表"、行情"qfq，锚点=分析日"——已在数据层表头与上下文里，B3 只验证模型是否**引用**了它们。
+2. **交易约束**：涨跌停/T+1/整手/ST 不可假设——已注入 `instrument_context`（B1-4），B3 验证是否被遵守。
+3. **缺失数据纪律**：`NO_DATA_AVAILABLE`/`DATA_UNAVAILABLE` 必须原样呈现，不得换算或猜测——这是评测的核心断言。
+4. **合规措辞**：研究报告口吻，不写成"买卖建议"（借鉴 CN 的 guardrails 思路）。
+5. **不做的**：重写 12 个上游 prompt、翻译全文、把美股宏观段落删掉（那是 B2 的数据源问题，不是措辞问题）。
+
+## 5. 第一步（可立即执行）
+
+1. 建 `tests/downstream/test_prompt_contracts.py`：脚本化模型跑完整图，捕获 12 个 prompt，断言 B1 的注入确实出现（身份、涨跌停、T+1、口径、元数据）。
+2. 建 3 个黄金场景的最小 fixture（涨停、停牌、亏损财报），断言"数据不可用/涨停"进入 prompt 而不是被模型补全。
+3. 记录基线输出到 `docs/B3_BASELINE.md`（脚本化模型下可重复）。
+4. 之后再讨论 prompt 文本改动——且只在"评测能证明改善"时做。

@@ -80,6 +80,8 @@
 | D-0030 | 本条提交 `docs(extension)` | docs | 扩展架构 v2.1 重写（层级按实际侵入性、兼容性表述、并发矩阵、严格模式、入口规则、L4a 取消行数门槛） | 无 | 无 | 不涉及代码 |
 | D-0031 | 本条提交 `feat(insider)` | feat | `get_insider_transactions` → Tushare `stk_holdertrade`，按公告日过滤；默认 `tool_vendors` 定向到 `tushare,yfinance` | 无 | 无 | 新增 5 项离线 + 1 项 live |
 | D-0032 | 本条提交 `feat(context)` | feat | 交易约束（涨跌停/T+1/整手，ST 不假设）注入 `instrument_context`；新增 `reference_price()` | 无 | 无 | 图接线 12 项 + 规则 14 项 |
+| D-0033 | 本条提交 `docs(data)` | docs | `DATA_REQUIREMENTS.md`（news 只要标题+摘要+链接+时间；宏观/情绪/预测市场的替代验收标准） | 无 | 无 | 不涉及代码 |
+| D-0034 | 本条提交 `docs(b3)` | docs | `B3_PROMPT_PLAN.md`：评测骨架先行 + TradingAgents-CN prompt 改动核对结论 | 无 | 无 | 不涉及代码 |
 
 十余条下游提交合计新增代码与文档，**0 行上游改动**。下游与上游的唯一耦合是文档里登记的"脆弱耦合"，
 现在由 `tests/downstream/test_sync_guard.py`（12 组断言）机械锁定。

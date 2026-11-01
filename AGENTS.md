@@ -19,6 +19,8 @@
 | `docs/WEB_PLAN.md` | Web 界面（B4）：局域网单用户、单 worker、服务端渲染、安全边界 |
 | `docs/EXTENSION_ARCHITECTURE.md` | **扩展架构 v2**：L1–L4 手段、关键契约、Checkpoint/版本、补丁登记 |
 | `docs/UPSTREAM_CONTRIBUTION_PLAN.md` | 上游贡献备选计划（非近期重点，含触发条件） |
+| `docs/DATA_REQUIREMENTS.md` | 各数据接口的上游需求规格与替代验收标准（新闻/宏观/情绪） |
+| `docs/B3_PROMPT_PLAN.md` | Prompt 专题：先评测后改、CN 项目参照结论 |
 
 ---
 
