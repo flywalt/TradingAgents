@@ -87,7 +87,12 @@ def execute(conn, run_id: str, *, build_graph=None) -> None:
 
     jobs.mark_running(conn, run_id)
     try:
-        graph = build_graph(_job_overrides(job), symbol=job["symbol"], market=job["market"])
+        graph = build_graph(
+            _job_overrides(job),
+            symbol=job["symbol"],
+            market=job["market"],
+            selected_analysts=tuple(json.loads(job["analysts"])),
+        )
         profile = graph.config.get("cn_market_profile", job["profile"])
         emit("run.started", {"symbol": job["symbol"], "date": job["trade_date"],
                              "profile": profile})

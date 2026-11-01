@@ -139,3 +139,20 @@ def test_the_worker_runs_queued_jobs_and_reports_recovery(tmp_path):
         assert jobs.get(check, interrupted)["error_category"] == "interrupted"
     finally:
         check.close()
+
+
+def test_the_run_honours_the_selected_analysts(conn, tmp_path):
+    """A job that asked for one analyst must not run all four."""
+    run_id = jobs.create(conn, symbol="600519.SH", market="CN", profile="CN_A_SHARE",
+                         trade_date="2026-10-30", analysts=["market"], language="English",
+                         strict=False, portfolio_json=None)
+    graph = FakeGraph(tmp_path)
+    seen = {}
+
+    def build(config, **kwargs):
+        seen.update(kwargs)
+        return graph
+
+    runner.execute(conn, run_id, build_graph=build)
+
+    assert seen["selected_analysts"] == ("market",)
