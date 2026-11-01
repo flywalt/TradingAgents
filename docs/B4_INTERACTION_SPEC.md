@@ -279,3 +279,40 @@ rating = run_rating(final)                                   # 五档 or REVIEW
 
 采纳：错误分类器、SSE 心跳/重连、合规术语、历史过滤、排队可见性。
 拒绝：Redis 队列、强制 MongoDB、SSE+WebSocket 双栈、三套 analysis service、Vue 构建、用户体系。
+
+
+## 15. 与 kviewer 的长期对接（本阶段只埋钩子，不实现）
+
+结论：**两个服务、一份契约**，不合并代码库。kviewer 负责"看"（K 线/资金面/自选），
+本项目负责"判断"（研究/评级/记忆），持仓账本属于第三块，不塞进分析服务。
+
+### 15.1 已核对的兼容点（kviewer 源码）
+
+| 点 | kviewer 事实 | 我们的对齐方式 |
+| --- | --- | --- |
+| 符号格式 | `^\d{6}\.(SH|SZ|BJ)$`（`src/validation.ts`） | DB/API 一律 `600519.SH`（与我们的 `normalize` 一致） |
+| 复权锚点 | qfq = `raw × f_row / f_base`，**base = 返回序列最后一行**（`kline.pure.ts`） | 链接必须带 `end=分析日`；否则历史报告与图上价格在除权后不一致 |
+| 指标口径 | 前端算通达信 MA/MACD/KDJ | 我们 Python 算 13 个 TDX 指标 → 可做交叉校验 |
+| 存储策略 | D1 存原始价+因子，读时现算 | 证明"自算复权"可行；未来审计级复现可参考 |
+
+### 15.2 W1 必须埋的五个钩子（低成本、不可后补的）
+
+| # | 钩子 | 实现 |
+| --- | --- | --- |
+| H1 | **稳定 URL** | `/runs/{id}` 与 `/runs/{id}/report` 永久不变，供外部长期链接 |
+| H2 | **符号规范化** | DB `symbol` 与 API 一律 `<code>.<exchange>`；另存 `display_name` |
+| H3 | **锚点入元数据** | `job.json` 必含 `data_as_of`（分析日）与 `qfq_anchor`（=分析日），跨系统展示有据 |
+| H4 | **只读凭据与 CORS** | `TRADINGAGENTS_WEB_READ_TOKEN`（只读 `/api/runs*`）+ `TRADINGAGENTS_WEB_CORS_ORIGINS`（逗号分隔白名单） |
+| H5 | **链接模板** | `KVIEWER_BASE_URL`（空=不显示）；生成 `#/kline?symbol=<symbol>&start=<报告起始>&end=<分析日>` |
+
+### 15.3 不在本阶段做
+
+- kviewer 反向调用我们的 API：Cloudflare Worker **不能直连局域网**，需要 Tunnel + 只读 token，
+  属于独立工程（W2 以后）。
+- 持仓/盈亏账本：第三块产品，独立建模与测试，不并入分析服务。
+- 以 kviewer 作为数据源：当前 Tushare 直连更简单；仅在 Tushare 不可用时再评估。
+
+### 15.4 验收补充
+
+W1 额外断言：H3 的 `job.json` 含 `data_as_of`/`qfq_anchor`；H4 的只读 token 能读 `/api/runs` 但不能写；
+H5 在配置了 `KVIEWER_BASE_URL` 时报告页出现正确 `end=分析日` 的链接。

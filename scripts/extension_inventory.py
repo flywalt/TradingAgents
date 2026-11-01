@@ -20,12 +20,14 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 PACKAGE = ROOT / "tradingagents_cn"
+WEB = ROOT / "tradingagents_web"
 TESTS = ROOT / "tests" / "downstream"
 DOC = ROOT / "docs" / "EXTENSIONS.md"
 
 
 def modules() -> list[str]:
-    return sorted(str(path.relative_to(ROOT)) for path in PACKAGE.rglob("*.py"))
+    paths = list(PACKAGE.rglob("*.py")) + list(WEB.rglob("*.py"))
+    return sorted(str(path.relative_to(ROOT)) for path in paths)
 
 
 def tests() -> list[str]:
