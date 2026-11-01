@@ -129,4 +129,4 @@ def test_the_header_states_vendor_adjustment_and_window(api):
     assert "last 5 sessions" in head[0]
     assert "Vendor: tushare" in head[1]
     assert "adjustment: qfq" in head[1]
-    assert "stockstats" in head[1]
+    assert "tdx" in head[1]          # default flavour: 通达信口径

@@ -62,7 +62,9 @@
 | D-0012 | `43dc4a6` `feat(config)` | feat | `cn_strict_ashare` 单 vendor 链 + 三类 vendor 链扩展 | 无 | 无 | 全量 1599 passed |
 | D-0013 | `51487e9` `test(data)` | test/docs | 9 个真实接口冒烟 + `docs/ASHARE_DATA.md` | 无 | 无 | `-m integration` → 9 passed |
 | D-0014 | `917d1d4` `chore(env)` | chore | uv 管理环境 + `requirements-downstream.txt` + `requirements-lock.txt` + `docs/DEV_ENV.md` | 无 | 无 | `uv run pytest -q` → 1599 passed；integration 9 passed |
-| D-0015 | 本条提交 `docs(plan)` | docs | A 股数据层设计文档（含 builder check 裁决）与实施计划 | 无 | 无 | 不涉及代码 |
+| D-0015 | `041b74a` `docs(plan)` | docs | A 股数据层设计文档（含 builder check 裁决）与实施计划 | 无 | 无 | 不涉及代码 |
+| D-0016 | `8a03f73` `fix(data)` | fix | reviewer 修复：指数权重数据源、两融单位、f_ann_date 去重、缓存上限、env 优先级、指数/资金流单位 | 无 | 无 | 全量 1606 passed |
+| D-0017 | 本条提交 `feat(indicators)` | feat | 通达信口径 13 指标（可切 stockstats）+ `cn_indicator_flavor` + 价格头写明复权锚点 | 无 | 无 | 全量 1619 passed；integration 9 passed |
 
 十余条下游提交合计新增代码与文档，**0 行上游改动**。下游与上游的唯一耦合是文档里登记的"脆弱耦合"，
 现在由 `tests/downstream/test_sync_guard.py`（12 组断言）机械锁定。

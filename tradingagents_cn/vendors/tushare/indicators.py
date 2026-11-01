@@ -20,6 +20,7 @@ from stockstats import wrap
 from tradingagents.dataflows.config import get_config
 from tradingagents_cn.cache import cached
 from tradingagents_cn.vendors.common import adjustment, require_ashare
+from tradingagents_cn.vendors.tushare import tdx_indicators
 from tradingagents_cn.vendors.tushare.stock import fetch_bars
 
 #: The 13 names upstream's ``get_indicators`` tool documents.
@@ -59,6 +60,21 @@ _MIN_SESSIONS = {
 _BARS_TTL_SECONDS = 60 * 60
 _CSV_HEADER = "Date,{indicator}"
 
+_FLAVOR_LABELS = {
+    tdx_indicators.TDX_FLAVOR: "tdx (通达信口径)",
+    tdx_indicators.STOCKSTATS_FLAVOR: "stockstats (维基口径)",
+}
+
+
+def resolve_flavor() -> str:
+    """The configured indicator flavour (``cn_indicator_flavor``)."""
+    raw = str(get_config().get("cn_indicator_flavor", tdx_indicators.TDX_FLAVOR)).strip().lower()
+    if raw not in tdx_indicators.FLAVORS:
+        raise ValueError(
+            f"cn_indicator_flavor must be one of {tdx_indicators.FLAVORS}, got {raw!r}"
+        )
+    return raw
+
 
 def get_stock_stats_indicators_window(
     symbol: str, indicator: str, as_of_date: str, look_back_days: int
@@ -84,14 +100,15 @@ def get_stock_stats_indicators_window(
         lambda: fetch_bars(canonical, start, as_of, adjust=adjust),
     )
 
-    values = indicator_series(bars, name)
+    flavor = resolve_flavor()
+    values = indicator_series(bars, name, flavor)
     window = bars["trade_date"].tail(sessions)
     observed = values.tail(sessions)
 
     lines = [
         f"# Indicators for {canonical} as of {as_of} (last {sessions} sessions)",
         f"# Vendor: tushare; adjustment: {adjust or 'none'}; "
-        "computation: local stockstats over tushare bars",
+        f"computation: {_FLAVOR_LABELS[flavor]} over tushare bars",
         _CSV_HEADER.format(indicator=name),
     ]
     for trading_day, value in zip(window, observed, strict=True):
@@ -99,8 +116,20 @@ def get_stock_stats_indicators_window(
     return "\n".join(lines) + "\n"
 
 
-def indicator_series(bars: pd.DataFrame, name: str) -> pd.Series:
-    """The indicator over ``bars``, blanked where history is too short."""
+def indicator_series(bars: pd.DataFrame, name: str, flavor: str | None = None) -> pd.Series:
+    """The indicator over ``bars``, blanked where history is too short.
+
+    ``flavor`` defaults to ``cn_indicator_flavor`` (通达信 by default).
+    """
+    flavor = flavor or resolve_flavor()
+    if flavor == tdx_indicators.TDX_FLAVOR:
+        series = tdx_indicators.compute(name, bars)
+        values = pd.Series(series.to_numpy(), index=bars.index, dtype="float64")
+        required = _MIN_SESSIONS[name]
+        if required > 1:
+            values.iloc[: required - 1] = float("nan")
+        return values
+
     frame = pd.DataFrame(
         {
             "date": pd.to_datetime(bars["trade_date"]),

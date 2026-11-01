@@ -34,6 +34,9 @@ DEFAULT_CN_CONFIG: dict = {
     "cn_calendar_holidays": (),
     #: Whether Beijing Stock Exchange symbols are in scope.
     "cn_include_bj": True,
+    #: Indicator formulas: "tdx" (通达信, what A-share readers compare against)
+    #: or "stockstats" (the upstream/Wikipedia set).
+    "cn_indicator_flavor": "tdx",
     #: Strict A-share mode: chains become Tushare-only, so a Tushare outage is
     #: reported as unavailable instead of silently served from Yahoo (a
     #: different price basis). Off by default so US tickers keep working.
@@ -54,12 +57,14 @@ _ENV_OVERRIDES = {
     "TRADINGAGENTS_CN_ADJUST": "cn_adjust",
     "TRADINGAGENTS_CN_INCLUDE_BJ": "cn_include_bj",
     "TRADINGAGENTS_CN_STRICT_ASHARE": "cn_strict_ashare",
+    "TRADINGAGENTS_CN_INDICATOR_FLAVOR": "cn_indicator_flavor",
 }
 
 _TRUE = ("true", "1", "yes", "on")
 _FALSE = ("false", "0", "no", "off")
 
 ADJUSTMENTS = ("qfq", "hfq", "none")
+INDICATOR_FLAVORS = ("tdx", "stockstats")
 
 
 def _coerce(value: str, reference):
@@ -150,6 +155,12 @@ def _validate(config: dict) -> None:
     if adjust is not None and str(adjust).lower() not in ADJUSTMENTS:
         raise ValueError(f"cn_adjust must be one of {ADJUSTMENTS}, got {adjust!r}")
     config["cn_adjust"] = str(adjust).lower()
+    flavor = str(config.get("cn_indicator_flavor", "tdx")).strip().lower()
+    if flavor not in INDICATOR_FLAVORS:
+        raise ValueError(
+            f"cn_indicator_flavor must be one of {INDICATOR_FLAVORS}, got {flavor!r}"
+        )
+    config["cn_indicator_flavor"] = flavor
 
 
 def apply(

@@ -140,3 +140,13 @@ def test_an_environment_pin_beats_a_caller_override():
 
     assert merged["cn_strict_ashare"] is True
     assert merged["data_vendors"]["technical_indicators"] == "tushare"
+
+
+def test_the_indicator_flavour_defaults_to_tongdaxin():
+    merged = cn_config.apply()
+    assert merged["cn_indicator_flavor"] == "tdx"
+
+
+def test_an_unknown_indicator_flavour_fails_at_startup():
+    with pytest.raises(ValueError, match="cn_indicator_flavor"):
+        cn_config.apply({"cn_indicator_flavor": "talib"})

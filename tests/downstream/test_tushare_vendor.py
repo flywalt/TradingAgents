@@ -97,10 +97,11 @@ def test_bars_carry_their_units_ordering_and_price_basis(fake_api):
     assert lines[0] == f"# Stock data for {SYMBOL} from 2026-01-05 to 2026-01-09"
     assert "adjustment: qfq" in lines[1]
     assert "volume in shares; amount in CNY" in lines[1]
-    assert lines[2] == "# Total records: 3"
-    assert lines[4] == "Date,Open,High,Low,Close,Volume,Amount,PctChg"
+    assert "qfq anchored at 2026-01-09" in lines[2]
+    assert lines[3] == "# Total records: 3"
+    assert lines[5] == "Date,Open,High,Low,Close,Volume,Amount,PctChg"
 
-    rows = [line.split(",") for line in lines[5:] if line]
+    rows = [line.split(",") for line in lines[6:] if line]
     assert [row[0] for row in rows] == ["2026-01-05", "2026-01-06", "2026-01-07"]
     assert rows[0] == ["2026-01-05", "1680.50", "1690.00", "1675.00", "1685.00",
                        "10000", "1685000", "0.30"]

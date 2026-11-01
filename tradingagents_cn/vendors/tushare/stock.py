@@ -113,6 +113,7 @@ def _format(data: pd.DataFrame, canonical: str, start_date: str, end_date: str,
         f"# Stock data for {canonical} from {start_date} to {end_date}",
         f"# Vendor: {_VENDOR}; adjustment: {adjust or 'none'}; "
         "volume in shares; amount in CNY; prices in CNY",
+        _anchor_line(adjust, end_date),
         f"# Total records: {len(records)}",
         "",
         ",".join(_CSV_COLUMNS),
@@ -130,6 +131,22 @@ def _format(data: pd.DataFrame, canonical: str, start_date: str, end_date: str,
             )
         )
     return "\n".join(lines) + "\n"
+
+
+def _anchor_line(adjust: str, end_date: str) -> str:
+    """State where a 前/后复权 series is anchored, because the anchor moves it.
+
+    Tushare adjusts against the requested range's end, so a run dated ``T`` sees
+    the series as it looked on ``T`` — reproducible, and free of the corporate
+    actions that happened after it. The line says so, so nobody compares a
+    historical report with today's series by accident.
+    """
+    if adjust in ("qfq", "hfq"):
+        return (
+            f"# Price basis: {adjust} anchored at {end_date} "
+            "(复权以区间末为基准; 其后发生除权时，历史价格会随之变化)"
+        )
+    return "# Price basis: none (不复权: 交易所实际成交价)"
 
 
 def _decimal(value) -> str:
