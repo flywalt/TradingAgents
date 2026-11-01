@@ -94,6 +94,7 @@ MANAGED_METHODS = (
     "get_balance_sheet",
     "get_cashflow",
     "get_income_statement",
+    "get_insider_transactions",
 )
 
 ADJUSTMENTS = ("qfq", "hfq", "none")
@@ -238,6 +239,13 @@ def apply(
 
     if merged.get("cn_strict_ashare"):
         _enforce_strict_tool_vendors(merged)
+    else:
+        # Insider data sits in upstream's news_data category, whose category-level
+        # chain is Yahoo (that is what serves news). Pin this one tool instead of
+        # making the whole category look A-share served.
+        merged.setdefault("tool_vendors", {}).setdefault(
+            "get_insider_transactions", "tushare,yfinance"
+        )
     return merged
 
 

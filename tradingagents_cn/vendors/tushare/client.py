@@ -87,6 +87,10 @@ class TushareApi:
         """Valuation and trading snapshot for a session (PE/PB/PS/市值/换手)."""
         return self._call("daily_basic", **kwargs)
 
+    def stk_holdertrade(self, **kwargs):
+        """Insider / major-holder trades with their announcement date."""
+        return self._call("stk_holdertrade", **kwargs)
+
     def fina_indicator(self, **kwargs):
         """Financial-indicator summary per report period (EPS, ROE, margins)."""
         return self._call("fina_indicator", **kwargs)

@@ -171,3 +171,17 @@ def test_live_snapshot_uses_tushare_numbers():
     assert text.startswith(f"# Verified market snapshot for {SYMBOL}")
     assert "Vendor: tushare" in text
     assert "- rsi:" in text
+
+
+def test_live_insider_transactions_answer():
+    _skip_without_prerequisites()
+    from tradingagents_cn.vendors.tushare import client
+    from tradingagents_cn.vendors.tushare.insider import get_insider_transactions
+
+    client.reset_api()
+    end = date.today()
+    text = get_insider_transactions(SYMBOL, end.isoformat())
+
+    assert text.startswith(f"# Insider transactions for {SYMBOL}")
+    rows = [line for line in text.splitlines() if line and not line.startswith("#")]
+    assert len(rows) > 1

@@ -27,6 +27,7 @@ from tradingagents_cn.bootstrap import ensure_bootstrapped
 from tradingagents_cn.identity import resolve_identity_at
 from tradingagents_cn.runmeta import attach as attach_run_metadata, collect as collect_run_metadata
 from tradingagents_cn.symbols import is_ashare
+from tradingagents_cn.trading_rules import limit_ratio, lot_rule
 
 logger = logging.getLogger(__name__)
 
@@ -56,9 +57,13 @@ class CnTradingAgentsGraph(TradingAgentsGraph):
     ) -> str:
         """Identity context for ``ticker``; same signature and contract as upstream."""
         identity = self._ashare_identity(ticker, trade_date)
-        if not identity:
-            return super().resolve_instrument_context(ticker, asset_type, trade_date)
-        return build_instrument_context(ticker, asset_type, identity, trade_date)
+        if identity:
+            context = build_instrument_context(ticker, asset_type, identity, trade_date)
+        else:
+            context = super().resolve_instrument_context(ticker, asset_type, trade_date)
+        if is_ashare(ticker):
+            context += _trading_constraints(ticker)
+        return context
 
     def run_metadata(self, trade_date: str, ticker: str | None = None) -> dict:
         """Provenance for this run (also attached to every saved report)."""
@@ -81,3 +86,22 @@ class CnTradingAgentsGraph(TradingAgentsGraph):
             # run, it just leaves the context ticker-only.
             logger.warning("A-share identity unavailable for %s: %s", ticker, exc)
             return {}
+
+
+def _trading_constraints(ticker: str) -> str:
+    """The A-share rules an agent must respect when it proposes a trade.
+
+    Facts only — the band, the settlement rule and the lot size are deterministic
+    and cheap to state. ST status and suspensions are *not* in this feed, and the
+    text says so instead of letting the model assume they are absent.
+    """
+    ratio = limit_ratio(ticker) * 100
+    minimum, step = lot_rule(ticker)
+    lots = (f"{minimum} shares minimum, then 1-share increments" if step == 1
+            else f"{minimum}-share lots")
+    return (
+        f" A-share trading rules: daily price limit ±{ratio:.0f}% (board rule); "
+        "ST status and suspensions are unavailable from this data feed — do not assume "
+        f"either; T+1 settlement (shares bought today are sellable from the next session); "
+        f"orders in {lots}; any proposed fill must sit inside the limit band."
+    )

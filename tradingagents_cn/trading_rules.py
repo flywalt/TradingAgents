@@ -64,6 +64,24 @@ def price_limits(symbol: str, prev_close, *, is_st: bool = False) -> tuple[Decim
     return lower, upper
 
 
+def reference_price(prev_close, cash_div_per_share=0, share_ratio=0) -> Decimal:
+    """The exchange's ex-rights reference price for the next session.
+
+    On an ex-dividend day the limit band is computed from this value, not from
+    the previous close and not from a 前复权 series: on 2026-06-26 贵州茅台's
+    reference was 1212.10 - 23.957 = 1188.14, while the raw close (1212.10) and
+    the qfq close (1184.08) would both put the band in the wrong place.
+
+    ``share_ratio`` is the bonus/rights ratio per existing share (10送3 -> 0.3).
+    """
+    base = _to_price(prev_close)
+    cash = Decimal(str(cash_div_per_share or 0))
+    ratio = Decimal(str(share_ratio or 0))
+    if ratio <= -1:
+        raise ValueError(f"share_ratio must be greater than -1, got {share_ratio!r}")
+    return ((base - cash) / (Decimal(1) + ratio)).quantize(_PENNY, rounding=ROUND_HALF_UP)
+
+
 def is_limit_locked(symbol: str, prev_close, close, *, is_st: bool = False) -> bool | None:
     """Whether a session closed at its limit (``None`` when the price is outside the band).
 

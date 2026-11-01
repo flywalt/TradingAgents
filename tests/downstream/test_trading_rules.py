@@ -15,6 +15,7 @@ from tradingagents_cn.trading_rules import (
     lot_rule,
     lot_size,
     price_limits,
+    reference_price,
     round_down_to_lot,
     settlement_date,
 )
@@ -97,3 +98,18 @@ def test_settlement_is_the_next_session_not_the_next_day():
 def test_unparsable_prices_raise_instead_of_guessing(value):
     with pytest.raises((ValueError, TypeError)):
         price_limits(MAIN_SH, value)
+
+
+def test_the_exchange_reference_price_on_an_ex_dividend_day():
+    # 贵州茅台 2026-06-26: 1212.10 - 23.957 = 1188.143 -> 1188.14
+    assert reference_price("1212.10", cash_div_per_share="23.957") == Decimal("1188.14")
+
+
+def test_the_reference_price_handles_a_bonus_share_ratio():
+    # 10送3: one existing share becomes 1.3 shares
+    assert reference_price("10.00", share_ratio="0.3") == Decimal("7.69")
+
+
+def test_an_impossible_share_ratio_is_rejected():
+    with pytest.raises(ValueError):
+        reference_price("10.00", share_ratio="-1")

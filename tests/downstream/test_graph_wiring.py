@@ -166,3 +166,25 @@ def test_a_graph_cannot_be_built_before_registration(tmp_path, monkeypatch):
 
     bootstrap()
     CnTradingAgentsGraph(config=cfg)     # no raise once registered
+
+
+def test_trading_constraints_follow_the_board(graph):
+    main = graph.resolve_instrument_context("600519.SH", "stock", "2026-10-30")
+    star = graph.resolve_instrument_context("688981.SH", "stock", "2026-10-30")
+    beijing = graph.resolve_instrument_context("430047.BJ", "stock", "2026-10-30")
+
+    assert "±10%" in main and "T+1" in main
+    assert "±20%" in star
+    assert "±30%" in beijing and "1-share increments" in beijing
+
+
+def test_a_foreign_ticker_gets_no_a_share_rules(graph, monkeypatch):
+    monkeypatch.setattr(
+        upstream_graph, "resolve_instrument_identity",
+        lambda ticker: {"name": "Apple Inc."},
+    )
+
+    context = graph.resolve_instrument_context("AAPL", "stock", "2026-10-30")
+
+    assert "T+1" not in context
+    assert "price limit" not in context
