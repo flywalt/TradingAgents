@@ -12,11 +12,15 @@ from tradingagents_cn.register import register_vendor
 
 from .calendar import calendar_from_frame, load_calendar
 from .client import TOKEN_ENV, TushareApi, get_api, reset_api, set_api
+from .indicators import SUPPORTED_INDICATORS, get_stock_stats_indicators_window
 from .stock import get_stock_data
 
 #: The router methods this vendor serves. Only prices for now: fundamentals
 #: (CAS statements) and capital flows follow as separate adapters.
-VENDOR_METHODS = {"get_stock_data": get_stock_data}
+VENDOR_METHODS = {
+    "get_stock_data": get_stock_data,
+    "get_indicators": get_stock_stats_indicators_window,
+}
 
 
 def register_vendors() -> None:
@@ -26,12 +30,14 @@ def register_vendors() -> None:
 
 
 __all__ = [
+    "SUPPORTED_INDICATORS",
     "TOKEN_ENV",
     "TushareApi",
     "VENDOR_METHODS",
     "calendar_from_frame",
     "get_api",
     "get_stock_data",
+    "get_stock_stats_indicators_window",
     "load_calendar",
     "register_vendors",
     "reset_api",

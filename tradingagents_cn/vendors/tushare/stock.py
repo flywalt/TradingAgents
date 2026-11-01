@@ -5,8 +5,9 @@ implementations (``symbol, start_date, end_date``) and returns the same shape of
 text: a header naming the instrument, the vendor and the price basis, then CSV
 rows the analyst can read.
 
-Three conversions happen here and are stated in the output, because a reader who
-guesses them wrong will mis-price the instrument:
+``fetch_bars`` is the numeric half, shared with the indicator module so both
+read one price basis. Three conversions happen there and are stated in the
+output, because a reader who guesses them wrong will mis-price the instrument:
 
 * ``vol`` comes in 手 (100 shares) and is served in shares;
 * ``amount`` comes in 千元 and is served in CNY;
@@ -29,19 +30,32 @@ _VENDOR = "tushare"
 _REQUIRED_COLUMNS = ("trade_date", "open", "high", "low", "close", "vol")
 _PRICE_FIELDS = ("Open", "High", "Low", "Close")
 _CSV_COLUMNS = ("Date", "Open", "High", "Low", "Close", "Volume", "Amount", "PctChg")
+_NUMERIC_COLUMNS = ("open", "high", "low", "close", "vol", "amount")
 
 
-def get_stock_data(symbol: str, start_date: str, end_date: str) -> str:
-    """Daily OHLCV bars for an A-share symbol, adjusted per ``cn_adjust``."""
+def resolve_adjust() -> str:
+    """The adjustment this run serves (``cn_adjust``), lower-cased and validated."""
+    return adjustment(get_config())
+
+
+def fetch_bars(
+    symbol: str, start_date: str, end_date: str, *, adjust: str | None = None
+) -> pd.DataFrame:
+    """Normalized bars: ISO dates ascending, volume in shares, amount in CNY.
+
+    ``adjust`` defaults to the run's ``cn_adjust``. A foreign symbol raises
+    ``NoMarketDataError`` before any request, which is how the router learns to
+    try the next vendor.
+    """
     canonical = require_ashare(symbol)
     start, end = _iso(start_date), _iso(end_date)
-    adjust = adjustment(get_config())
+    resolved = resolve_adjust() if adjust is None else str(adjust).lower()
 
     api = client.get_api()
     try:
         frame = api.pro_bar(
             ts_code=canonical,
-            adj=adjust or None,
+            adj=resolved or None,
             start_date=_compact(start),
             end_date=_compact(end),
             asset="E",
@@ -56,10 +70,20 @@ def get_stock_data(symbol: str, start_date: str, end_date: str) -> str:
     if frame is None or len(frame) == 0:
         raise no_rows(symbol, canonical, f"tushare returned no bars between {start} and {end}")
 
-    return _format(frame, canonical, start, end, adjust)
+    return _normalize(frame)
 
 
-def _format(frame, canonical: str, start_date: str, end_date: str, adjust: str) -> str:
+def get_stock_data(symbol: str, start_date: str, end_date: str) -> str:
+    """Daily OHLCV bars for an A-share symbol, adjusted per ``cn_adjust``."""
+    canonical = require_ashare(symbol)
+    start, end = _iso(start_date), _iso(end_date)
+    adjust = resolve_adjust()
+
+    data = fetch_bars(canonical, start, end, adjust=adjust)
+    return _format(data, canonical, start, end, adjust)
+
+
+def _normalize(frame) -> pd.DataFrame:
     missing = [column for column in _REQUIRED_COLUMNS if column not in frame.columns]
     if missing:
         raise VendorUnavailableError(
@@ -73,6 +97,17 @@ def _format(frame, canonical: str, start_date: str, end_date: str, adjust: str) 
     )
     data = data.sort_values("trade_date")
 
+    for column in _NUMERIC_COLUMNS:
+        if column in data.columns:
+            data[column] = pd.to_numeric(data[column], errors="coerce")
+    data["vol"] = data["vol"] * 100            # 手 -> 股
+    if "amount" in data.columns:
+        data["amount"] = data["amount"] * 1000  # 千元 -> 元
+    return data.reset_index(drop=True)
+
+
+def _format(data: pd.DataFrame, canonical: str, start_date: str, end_date: str,
+            adjust: str) -> str:
     records = data.to_dict("records")
     lines = [
         f"# Stock data for {canonical} from {start_date} to {end_date}",
@@ -88,8 +123,8 @@ def _format(frame, canonical: str, start_date: str, end_date: str, adjust: str) 
                 [
                     str(row["trade_date"]),
                     *(_decimal(row.get(field.lower())) for field in _PRICE_FIELDS),
-                    str(_scaled(row.get("vol"), 100)),
-                    str(_scaled(row.get("amount"), 1000)),
+                    str(_scaled_int(row.get("vol"))),
+                    str(_scaled_int(row.get("amount"))),
                     _decimal(row.get("pct_chg")),
                 ]
             )
@@ -109,8 +144,8 @@ def _decimal(value) -> str:
     return f"{float(value):.2f}"
 
 
-def _scaled(value, factor: int) -> int:
-    """A unit conversion (手 -> 股, 千元 -> 元); a missing value stays 0."""
+def _scaled_int(value) -> int:
+    """A count already in its serving unit; a missing value stays 0."""
     if value is None:
         return 0
     try:
@@ -118,7 +153,7 @@ def _scaled(value, factor: int) -> int:
             return 0
     except (TypeError, ValueError):
         return 0
-    return int(round(float(value) * factor))
+    return int(round(float(value)))
 
 
 def _iso(value: str) -> str:
@@ -132,4 +167,3 @@ def _iso(value: str) -> str:
 def _compact(iso_date: str) -> str:
     """``2026-01-09`` -> ``20260109``, the form Tushare's APIs take."""
     return iso_date.replace("-", "")
-
