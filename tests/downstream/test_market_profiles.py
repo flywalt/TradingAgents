@@ -164,3 +164,37 @@ def test_the_cn_graph_refuses_a_share_rules_under_a_foreign_profile(offline, mon
     context = graph.resolve_instrument_context("600519.SH", "stock", "2026-10-30")
 
     assert "T+1" not in context
+
+
+def test_a_pre_applied_config_does_not_force_its_profile_onto_a_foreign_symbol(offline):
+    """The CLI used to pre-merge a CN config and then pass a symbol; that raised."""
+    cn_settings = cn_config.apply({**offline})
+
+    graph = build_graph(cn_settings, symbol="0700.HK")
+
+    assert type(graph) is TradingAgentsGraph
+    assert graph.config["cn_market_profile"] == PROFILE_DEFAULT
+
+
+def test_the_cli_does_not_pre_apply_a_profile(offline, tmp_path):
+    from tradingagents_cn import cli
+    from tradingagents_cn.graph import factory as graph_factory
+
+    seen = {}
+
+    def fake_build(config, **kwargs):
+        seen["config"] = config
+        seen["symbol"] = kwargs.get("symbol")
+        return type("G", (), {"propagate": lambda self, *a, **k: ({}, "Hold"),
+                              "save_reports": lambda self, *a, **k: tmp_path / "r.md"})()
+
+    original = graph_factory.build_graph
+    graph_factory.build_graph = fake_build
+    try:
+        code = cli.main(["analyze", "--ticker", "0700.HK", "--date", "2026-10-30"])
+    finally:
+        graph_factory.build_graph = original
+
+    assert code == 0
+    assert seen["symbol"] == "0700.HK"
+    assert "cn_market_profile" not in seen["config"]   # raw overrides only

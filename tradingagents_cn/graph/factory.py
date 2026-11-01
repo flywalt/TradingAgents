@@ -36,11 +36,14 @@ def build_graph(
     # Precedence: explicit profile/market > symbol > an already-typed config.
     # A config that names its profile (from a previous apply) keeps it, so
     # callers that pre-merge settings do not have to repeat the symbol.
-    chosen = select_profile(
-        market=market,
-        symbol=symbol,
-        profile=profile or (config or {}).get("cn_market_profile"),
-    )
+    if market or symbol:
+        # The symbol/market is authoritative: a config that was pre-merged for
+        # another profile must not force its profile onto this run.
+        chosen = select_profile(market=market, symbol=symbol, profile=profile)
+    else:
+        chosen = select_profile(
+            profile=profile or (config or {}).get("cn_market_profile")
+        )
 
     bootstrap()
     settings = cn_config.apply(config, profile=chosen)

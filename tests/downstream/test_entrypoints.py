@@ -131,11 +131,12 @@ def test_batch_uses_one_graph_per_task(monkeypatch):
     assert len(built) == 4
 
 
-def test_batch_applies_the_downstream_config(monkeypatch):
+def test_batch_passes_raw_config_and_the_symbol(monkeypatch):
     seen = {}
 
     def fake_build(config, **kwargs):
         seen["config"] = config
+        seen["symbol"] = kwargs.get("symbol")
         return FakeGraph()
 
     monkeypatch.setattr(graph_factory, "build_graph", fake_build)
@@ -143,5 +144,5 @@ def test_batch_applies_the_downstream_config(monkeypatch):
     run_batch(["600519.SH"], ["2026-10-30"], config={"cn_strict_ashare": True})
 
     assert seen["config"]["cn_strict_ashare"] is True
-    assert seen["config"]["cn_extension_version"]
-    assert cn_config.MANAGED_METHODS[0] in seen["config"]["tool_vendors"]
+    assert seen["symbol"] == "600519.SH"
+    assert "cn_market_profile" not in seen["config"]

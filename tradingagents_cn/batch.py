@@ -39,14 +39,13 @@ def run_batch(
     A fresh graph per task keeps checkpoint state and configuration independent —
     the same rule the single-run path follows, for the same reason.
     """
-    settings = cn_config.apply(config)
     results: list[BatchResult] = []
 
     for ticker in tickers:
         for trade_date in dates:
             try:
                 graph = graph_factory.build_graph(
-                    settings,
+                    config,
                     market=market,
                     symbol=ticker,
                     selected_analysts=tuple(selected_analysts),

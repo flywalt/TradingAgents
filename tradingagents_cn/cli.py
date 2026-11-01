@@ -40,7 +40,7 @@ def _base_config(args) -> dict:
 
 def analyze(args) -> int:
     graph = graph_factory.build_graph(
-        cn_config.apply(_base_config(args)),
+        _base_config(args),
         market=args.market,
         symbol=args.ticker,
         selected_analysts=args.analysts,
