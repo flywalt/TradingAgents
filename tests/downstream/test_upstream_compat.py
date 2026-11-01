@@ -186,7 +186,10 @@ def test_graph_setup_keeps_its_injection_points():
 def test_trading_graph_keeps_the_methods_downstream_overrides():
     from tradingagents.graph.trading_graph import TradingAgentsGraph
 
-    for name in ("resolve_instrument_context", "_run_signature", "save_reports",
+    # ``_run_signature`` is deliberately absent: it is a private helper whose
+    # shape may change. Checkpoint invalidation is proven behaviourally in
+    # test_checkpoint_behavior.py through the public checkpoint_scope().
+    for name in ("resolve_instrument_context", "save_reports",
                  "_memory_step", "propagate", "run_settings"):
         assert callable(getattr(TradingAgentsGraph, name, None)), name
 

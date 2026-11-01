@@ -11,7 +11,6 @@ and pinned by ``tests/downstream/test_sync_guard.py``.
 """
 
 from ._version import VERSION as __version__
-
 from .bootstrap import (
     RegistrationReport,
     activate,

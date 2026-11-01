@@ -13,7 +13,6 @@ import pandas as pd
 import pytest
 
 from tradingagents.graph import trading_graph as upstream_graph
-
 from tradingagents_cn import config as cn_config
 from tradingagents_cn.bootstrap import reset
 from tradingagents_cn.graph.factory import build_graph

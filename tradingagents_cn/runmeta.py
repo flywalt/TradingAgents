@@ -15,7 +15,7 @@ import html as html_module
 import importlib.metadata
 import json
 import subprocess
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 #: Bump when the statement field mapping, units or PIT rules change shape.
@@ -62,7 +62,7 @@ def collect(config: dict, trade_date: str) -> dict:
         "financial_formula_version": FINANCIAL_FORMULA_VERSION,
         "market_rules_version": MARKET_RULES_VERSION,
         "data_as_of": str(trade_date or "unknown"),
-        "data_retrieved_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "data_retrieved_at": datetime.now(UTC).isoformat(timespec="seconds"),
     }
 
 
