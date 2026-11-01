@@ -84,6 +84,8 @@
 | D-0034 | 本条提交 `docs(b3)` | docs | `B3_PROMPT_PLAN.md`：评测骨架先行 + TradingAgents-CN prompt 改动核对结论 | 无 | 无 | 不涉及代码 |
 | D-0035 | 本条提交 `feat(markets)` | feat | `market.py`：`MarketProfile` + `UPSTREAM_DEFAULT`/`CN_A_SHARE` + 按交易所识别；`apply(profile=)` 与 `build_graph(market=,symbol=)` 分流；A 股规则仅在 CN profile 注入 | 无 | 无 | 新增 12 项多市场测试，全量 1697 passed |
 | D-0036 | 本条提交 `docs(markets)` | docs | `MARKET_PROFILES.md`（设计/隔离/目录/10 项测试对照）+ 架构文档 v2.2 多市场节 | 无 | 无 | 不涉及代码 |
+| D-0037 | 本条提交 `test(b3)` | test | Prompt 契约评测：记录型脚本模型捕获 12 节点 prompt，验证身份/规则/口径注入与美股隔离 | 无 | 无 | 新增 4 项，全量 1701 passed |
+| D-0038 | 本条提交 `docs(audit)` | docs | `EXTENSIONS.md` 可审计清单 + `scripts/extension_inventory.py --check`（模块/测试/配置键/补丁缺失即失败） | 无 | 无 | 清单检查通过 |
 
 十余条下游提交合计新增代码与文档，**0 行上游改动**。下游与上游的唯一耦合是文档里登记的"脆弱耦合"，
 现在由 `tests/downstream/test_sync_guard.py`（12 组断言）机械锁定。
