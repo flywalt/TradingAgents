@@ -24,8 +24,15 @@ _TTL_SECONDS = 60 * 60
 _WARMUP_DAYS = 120
 
 
-def build_market_snapshot(symbol: str, as_of_date: str, look_back_days: int = 30) -> str:
-    """Latest bar, recent closes and a few indicator values, all from one basis."""
+def build_market_snapshot(
+    symbol: str, as_of_date: str, look_back_days: int = 30, indicators=None
+) -> str:
+    """Latest bar, recent closes and a few indicator values, all from one basis.
+
+    ``indicators`` mirrors upstream's vendor signature; the snapshot always
+    renders the core set, so a caller-supplied list is accepted and ignored
+    rather than silently changing the report's shape.
+    """
     canonical = require_ashare(symbol)
     as_of = _iso(as_of_date)
     sessions = _positive(look_back_days, "look_back_days")

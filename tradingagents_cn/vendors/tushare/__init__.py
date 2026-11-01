@@ -9,6 +9,7 @@ it installed; a call without the SDK or without ``TUSHARE_TOKEN`` raises
 from __future__ import annotations
 
 from tradingagents_cn.bootstrap import register_category, register_vendor
+from tradingagents_cn.snapshot import build_market_snapshot
 
 from .calendar import calendar_from_frame, load_calendar
 from .client import TOKEN_ENV, TushareApi, get_api, reset_api, set_api
@@ -27,6 +28,7 @@ from .stock import get_stock_data
 #: (CAS statements) and capital flows follow as separate adapters.
 PROVIDERS = {
     "get_stock_data": get_stock_data,
+    "get_verified_market_snapshot": build_market_snapshot,
     "get_indicators": get_stock_stats_indicators_window,
     "get_fundamentals": get_fundamentals,
     "get_balance_sheet": get_balance_sheet,
