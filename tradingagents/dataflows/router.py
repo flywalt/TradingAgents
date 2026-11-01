@@ -38,6 +38,7 @@ from tradingagents.dataflows.vendors.yahoo.market import (
     get_YFin_data_online,
 )
 from tradingagents.dataflows.vendors.yahoo.news import get_global_news_yfinance, get_news_yfinance
+from tradingagents.dataflows.vendors.yahoo.snapshot import build_verified_market_snapshot
 
 logger = logging.getLogger(__name__)
 
@@ -46,7 +47,8 @@ TOOLS_CATEGORIES = {
     "core_stock_apis": {
         "description": "OHLCV stock price data",
         "tools": [
-            "get_stock_data"
+            "get_stock_data",
+            "get_verified_market_snapshot",
         ]
     },
     "technical_indicators": {
@@ -99,6 +101,10 @@ VENDOR_METHODS = {
     "get_stock_data": {
         "alpha_vantage": get_alpha_vantage_stock,
         "yfinance": get_YFin_data_online,
+    },
+    # core_stock_apis (verification view)
+    "get_verified_market_snapshot": {
+        "yfinance": build_verified_market_snapshot,
     },
     # technical_indicators
     "get_indicators": {
