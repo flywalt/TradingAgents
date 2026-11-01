@@ -107,6 +107,10 @@ class TushareApi:
         """China total social financing (monthly)."""
         return self._call("sf_month", **kwargs)
 
+    def shibor(self, **kwargs):
+        """Shanghai interbank offered rate (daily)."""
+        return self._call("shibor", **kwargs)
+
     def cn_pmi(self, **kwargs):
         """China manufacturing PMI (monthly)."""
         return self._call("cn_pmi", **kwargs)

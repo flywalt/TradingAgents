@@ -106,3 +106,13 @@ def test_the_default_profile_keeps_the_upstream_macro_chain():
     merged = cn_config.apply(profile=UPSTREAM_DEFAULT)
 
     assert merged["data_vendors"]["macro_data"] == "fred"
+
+
+def test_every_macro_alias_has_a_client_method():
+    """The alias table names endpoints; the client must expose each one."""
+    from tradingagents_cn.vendors.tushare.client import TushareApi
+    from tradingagents_cn.vendors.tushare.macro import ALIASES
+
+    missing = [endpoint for endpoint, *_ in ALIASES.values()
+               if not hasattr(TushareApi, endpoint)]
+    assert missing == []
