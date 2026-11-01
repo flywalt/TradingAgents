@@ -25,6 +25,7 @@ from tradingagents.dataflows.errors import VendorError
 from tradingagents.graph.trading_graph import TradingAgentsGraph
 from tradingagents_cn.bootstrap import ensure_bootstrapped
 from tradingagents_cn.identity import resolve_identity_at
+from tradingagents_cn.runmeta import attach as attach_run_metadata, collect as collect_run_metadata
 from tradingagents_cn.symbols import is_ashare
 
 logger = logging.getLogger(__name__)
@@ -58,6 +59,17 @@ class CnTradingAgentsGraph(TradingAgentsGraph):
         if not identity:
             return super().resolve_instrument_context(ticker, asset_type, trade_date)
         return build_instrument_context(ticker, asset_type, identity, trade_date)
+
+    def run_metadata(self, trade_date: str) -> dict:
+        """Provenance for this run (also attached to every saved report)."""
+        return collect_run_metadata(self.config, trade_date)
+
+    def save_reports(self, final_state, ticker, save_path=None, html=True):
+        """Upstream's report tree, plus the downstream provenance block."""
+        path = super().save_reports(final_state, ticker, save_path=save_path, html=html)
+        metadata = self.run_metadata(str(final_state.get("trade_date") or ""))
+        attach_run_metadata(path, metadata)
+        return path
 
     def _ashare_identity(self, ticker: str, trade_date: str | None) -> dict:
         if not is_ashare(ticker):
