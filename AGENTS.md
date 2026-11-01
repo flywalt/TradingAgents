@@ -16,6 +16,7 @@
 | `docs/TUSHARE.md` | A 股数据接入：行情/复权/交易日历、单位口径、路由回退、已知限制 |
 | `docs/ASHARE_DATA.md` | A 股数据层能力矩阵、价格/指标口径、缓存限流、限制清单 |
 | `docs/AGENT_MAP.md` | Agent 层地图：12 个节点的输入/工具/A 股可达性 + B1/B2/B3 批次计划 |
+| `docs/WEB_PLAN.md` | Web 界面（B4）：局域网单用户、单 worker、服务端渲染、安全边界 |
 
 ---
 

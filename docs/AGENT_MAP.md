@@ -89,6 +89,10 @@ START ─┬─ Market Analyst      ─┐
 
 news 三工具换国内源；sentiment 从美股社区换股吧/雪球/资金面。必然新增下游 analyst。
 
+### B4 — Web 界面（局域网单用户，单 worker 串行）
+
+下游新增包 `tradingagents_web/`，只做排队/调用/展示，不改上游。范围与端点见 `docs/WEB_PLAN.md`。
+
 ### B3 — prompt 专题（先评测后改）
 
 CAS/YTD/亿元口径、涨跌停/T+1/停牌约束、评级与合规措辞、日期时区。
