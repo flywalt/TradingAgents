@@ -138,3 +138,24 @@ def test_an_invalid_interval_fails_loudly(monkeypatch):
     monkeypatch.setenv("TRADINGAGENTS_CN_MIN_INTERVAL", "-1")
     with pytest.raises(ValueError, match="TRADINGAGENTS_CN_MIN_INTERVAL"):
         client.min_interval()
+
+
+def test_the_memory_layer_is_bounded(monkeypatch):
+    monkeypatch.setattr(cache, "MEMORY_LIMIT", 2)
+    for index in range(3):
+        cache.cached("probe", f"k{index}", 60, lambda index=index: index)
+
+    assert len(cache._MEMORY) == 2
+
+
+def test_expired_files_of_the_same_namespace_are_pruned_on_write(isolated_cache):
+    cache.cached("probe", "old", 60, lambda: "old")
+    for path in isolated_cache.rglob("*.pkl"):
+        old = time.time() - 7200
+        os.utime(path, (old, old))
+    cache.reset_memory_cache()
+
+    cache.cached("probe", "new", 60, lambda: "new")
+
+    names = [path.name for path in isolated_cache.rglob("*.pkl")]
+    assert len(names) == 1

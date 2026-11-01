@@ -128,8 +128,15 @@ def test_live_capital_flow_endpoints_answer():
     flow = get_money_flow(SYMBOL, start, end.isoformat())
     margin = get_margin_detail(SYMBOL, start, end.isoformat())
 
-    assert "net_mf_amount" in flow
-    assert "rzye" in margin
+    flow_rows = [line for line in flow.splitlines() if line and not line.startswith("#")]
+    margin_rows = [line for line in margin.splitlines() if line and not line.startswith("#")]
+    assert len(flow_rows) > 1 and "net_mf_amount" in flow
+    assert len(margin_rows) > 1
+    assert "单位亿元" in margin and "为股" in margin
+    header = margin_rows[0].split(",")
+    row = dict(zip(header, margin_rows[-1].split(","), strict=True))
+    # rzche is 元 on the wire; served in 亿元, so it must be far below 1e6.
+    assert float(row["rzche"]) < 1_000_000
 
 
 def test_live_index_and_identity_endpoints_answer():
@@ -144,8 +151,12 @@ def test_live_index_and_identity_endpoints_answer():
     members = list_index_members("000300.SH")
     identity = resolve_identity(SYMBOL)
 
-    assert "000300.SH" in daily
-    assert "con_code" in members or "weight" in members
+    assert "000300.SH" in daily and "vol in 手" in daily
+    member_rows = [line for line in members.splitlines() if line and not line.startswith("#")]
+    header = member_rows[0].split(",")
+    assert header[:2] == ["index_code", "con_code"], header
+    assert 1 < len(member_rows) - 1 <= 1000, len(member_rows)
+    assert "l1_code" not in members
     assert identity["name"] == "贵州茅台"
 
 

@@ -28,6 +28,7 @@ CATEGORY = "cn_capital_flows"
 
 _TTL_SECONDS = 60 * 60
 _NORTHBOUND_CUTOFF = "2024-08-16"
+_MARGIN_YUAN_COLUMNS = ("rzye", "rqye", "rzmre", "rzche", "rzrqye")
 
 
 def get_money_flow(symbol: str, start_date: str, end_date: str) -> str:
@@ -37,7 +38,7 @@ def get_money_flow(symbol: str, start_date: str, end_date: str) -> str:
     frame = _fetch("moneyflow", canonical, start, end)
     return _render(
         "资金流 (Money flow)", canonical, frame, start, end,
-        note="amounts in 万元 as served by tushare",
+        note="amounts in 万元; *_vol columns in 手 as served by tushare",
     )
 
 
@@ -58,12 +59,14 @@ def get_margin_detail(symbol: str, start_date: str, end_date: str) -> str:
     canonical = require_ashare(symbol)
     start, end = _iso(start_date), _iso(end_date)
     frame = _fetch("margin_detail", canonical, start, end).copy()
-    for column in ("rzye", "rqye", "rzmre", "rqyl"):
+    # Tushare mixes units inside one row: *ye/*mre/*che are 元, rqyl/rqmcl/rqchl
+    # are 股. Converting the share counts would divide a quantity by 1e8.
+    for column in _MARGIN_YUAN_COLUMNS:
         if column in frame.columns:
             frame[column] = pd.to_numeric(frame[column], errors="coerce") / 10**8
     return _render(
         "融资融券 (Margin balances)", canonical, frame, start, end,
-        note="amounts in 亿元",
+        note="金额列（rzye/rqye/rzmre/rzche/rzrqye）单位亿元；rqyl/rqmcl/rqchl 为股",
     )
 
 

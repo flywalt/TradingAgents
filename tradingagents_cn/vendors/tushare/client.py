@@ -119,8 +119,12 @@ class TushareApi:
         """Index daily bars."""
         return self._call("index_daily", **kwargs)
 
+    def index_weight(self, **kwargs):
+        """Index constituent weights for a published trade date."""
+        return self._call("index_weight", **kwargs)
+
     def index_member_all(self, **kwargs):
-        """Index membership (industry classification)."""
+        """Shenwan industry classification (NOT index constituents)."""
         return self._call("index_member_all", **kwargs)
 
     def _call(self, endpoint: str, **kwargs):

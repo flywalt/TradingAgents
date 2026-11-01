@@ -161,9 +161,10 @@ def apply(
     """Downstream config over upstream's ``DEFAULT_CONFIG``, with ``overrides`` on top.
 
     Precedence, lowest to highest: downstream defaults, upstream defaults,
-    ``TRADINGAGENTS_CN_*`` env vars, ``overrides``. The result is always a full
-    config (upstream keys included), so it can go straight into
-    ``TradingAgentsGraph(config=...)``.
+    ``overrides``, ``TRADINGAGENTS_CN_*`` env vars. Env wins so a deployment can
+    pin a mode (e.g. strict A-share chains) that application code cannot
+    silently downgrade. The result is always a full config (upstream keys
+    included), so it can go straight into ``TradingAgentsGraph(config=...)``.
 
     Vendor chains are installed last, from the *final* ``cn_strict_ashare``, and
     skip any category the caller set explicitly — a caller who chose a vendor
@@ -175,8 +176,8 @@ def apply(
     merged = deepcopy(DEFAULT_CONFIG)
     for key, value in DEFAULT_CN_CONFIG.items():
         merged.setdefault(key, deepcopy(value))
-    merged.update(env_overrides(environ))
     merged = _overlay(merged, explicit)
+    merged.update(env_overrides(environ))
     _validate(merged)
 
     if install_vendor_chain:

@@ -19,13 +19,16 @@ import hashlib
 import os
 import pickle
 import time
+from collections import OrderedDict
 from collections.abc import Callable
 from pathlib import Path
 from typing import TypeVar
 
 T = TypeVar("T")
 
-_MEMORY: dict[tuple[str, str], tuple[float, object]] = {}
+#: Bounded so a 5,000-symbol backtest cannot grow the process without limit.
+MEMORY_LIMIT = 256
+_MEMORY: OrderedDict[tuple[str, str], tuple[float, object]] = OrderedDict()
 _MISS = object()
 
 
@@ -65,6 +68,7 @@ def cached(namespace: str, key: str, ttl_seconds: int, producer: Callable[[], T]
 
     hit = _MEMORY.get(memory_key)
     if hit is not None and now - hit[0] < ttl_seconds:
+        _MEMORY.move_to_end(memory_key)
         return hit[1]
 
     path = _root() / f"{namespace}-{digest}.pkl"
@@ -78,7 +82,7 @@ def cached(namespace: str, key: str, ttl_seconds: int, producer: Callable[[], T]
         except Exception:  # noqa: BLE001 - a corrupt or older-format file is a miss
             value = _MISS
         if value is not _MISS:
-            _MEMORY[memory_key] = (now, value)
+            _remember(memory_key, now, value)
             return value
 
     value = producer()
@@ -87,10 +91,29 @@ def cached(namespace: str, key: str, ttl_seconds: int, producer: Callable[[], T]
         tmp = path.with_suffix(".tmp")
         tmp.write_bytes(pickle.dumps(value))
         os.replace(tmp, path)  # atomic: a reader never sees a half-written file
+        _prune(path.parent, namespace, ttl_seconds, keep=path)
     except OSError:
         pass  # an unwritable cache degrades to memory-only, never to a failure
-    _MEMORY[memory_key] = (now, value)
+    _remember(memory_key, now, value)
     return value
+
+
+def _remember(memory_key: tuple[str, str], now: float, value) -> None:
+    _MEMORY[memory_key] = (now, value)
+    _MEMORY.move_to_end(memory_key)
+    while len(_MEMORY) > MEMORY_LIMIT:
+        _MEMORY.popitem(last=False)
+
+
+def _prune(root: Path, namespace: str, ttl_seconds: int, *, keep: Path) -> None:
+    """Drop this namespace's expired files while writing a fresh one."""
+    now = time.time()
+    for candidate in root.glob(f"{namespace}-*.pkl"):
+        if candidate == keep:
+            continue
+        with contextlib.suppress(OSError):
+            if now - candidate.stat().st_mtime >= ttl_seconds:
+                candidate.unlink()
 
 
 def clear(namespace: str | None = None) -> None:

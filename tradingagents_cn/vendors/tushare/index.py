@@ -9,10 +9,11 @@ code is refused here: guessing would silently serve the wrong instrument.
 from __future__ import annotations
 
 import re
-from datetime import datetime
+from datetime import date, datetime, timedelta
 
 import pandas as pd
 
+from tradingagents.dataflows.date_window import get_current_date
 from tradingagents.dataflows.errors import VendorError, VendorUnavailableError
 from tradingagents_cn.cache import cached
 from tradingagents_cn.vendors.common import no_rows
@@ -60,18 +61,35 @@ def get_index_daily(index_code: str, start_date: str, end_date: str) -> str:
     frame = frame.copy()
     frame["trade_date"] = _display_dates(frame["trade_date"])
     return _render(f"指数行情 (Index daily) {canonical}", frame, start, end,
-                   note="prices in index points")
+                   note="prices in index points; vol in 手; amount in 千元")
 
 
-def list_index_members(index_code: str) -> str:
-    """Constituents with weights (``index_member_all`` / ``index_weight``)."""
+def list_index_members(index_code: str, trade_date: str | None = None,
+                       look_back_days: int = 90) -> str:
+    """Constituents and weights from ``index_weight``.
+
+    ``index_member_all`` is the Shenwan *industry* tree (l1/l2/l3 codes), not an
+    index's constituents — calling it with ``index_code`` returns the whole
+    market. Weights are published per trade date, so the latest date inside the
+    look-back window is served.
+    """
     canonical = normalize_index_code(index_code)
+    end = _iso(trade_date or get_current_date())
+    start = (date.fromisoformat(end) - timedelta(days=max(1, int(look_back_days)))).isoformat()
     frame = _fetch(
-        "index_member_all", canonical, "", "",
-        lambda: client.get_api().index_member_all(index_code=canonical),
+        "index_weight", canonical, start, end,
+        lambda: client.get_api().index_weight(
+            index_code=canonical, start_date=_compact(start), end_date=_compact(end)
+        ),
     )
-    return _render(f"指数成分 (Index members) {canonical}", frame, "", "",
-                   note="weights in % where present")
+    data = frame.copy()
+    data["trade_date"] = data["trade_date"].astype(str)
+    latest = data["trade_date"].max()
+    data = data[data["trade_date"] == latest]
+    return _render(
+        f"指数成分权重 (Index weights) {canonical}", data, start, end,
+        note=f"weights in %; one row per constituent for {latest}",
+    )
 
 
 def _fetch(endpoint: str, key: str, start: str, end: str, producer):

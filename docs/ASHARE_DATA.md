@@ -15,10 +15,10 @@
 | `get_cashflow` | `cashflow` | ✅ | 亿元，YTD |
 | `get_money_flow`（新） | `moneyflow` | ✅ 仅接口 | 万元 |
 | `get_northbound_holdings`（新） | `hk_hold` | ✅ 仅接口（逐日披露止于 2024-08-16） | 股 / % |
-| `get_margin_detail`（新） | `margin_detail` | ✅ 仅接口 | 亿元 |
+| `get_margin_detail`（新） | `margin_detail` | ✅ 仅接口 | 金额列亿元；rqyl/rqmcl/rqchl 为股 |
 | `get_top_list`（新） | `top_list` | ✅ 仅接口 | 元 |
-| `get_index_daily`（新） | `index_daily` | ✅ 仅接口 | 指数点 |
-| `list_index_members`（API） | `index_member_all` | ✅ 仅接口 | % |
+| `get_index_daily`（新） | `index_daily` | ✅ 仅接口 | 指数点；vol 手；amount 千元 |
+| `list_index_members`（API） | `index_weight`（成分权重，按交易日） | ✅ 仅接口 | % |
 | `resolve_identity`（API） | `stock_basic` | ✅ 仅接口 | — |
 | `build_market_snapshot`（API） | 日线 + 本地指标 | ✅ 仅接口 | 股 / 元 |
 | 新闻 / 公告 | — | ❌ 无权限（AkShare 专题） | — |
@@ -112,7 +112,9 @@ print(get_fundamentals("600519.SH", "2026-09-30"))
 2. **公司身份未接入图**：`resolve_identity` 可用，但上游仍用 Yahoo 解析；覆写 `resolve_instrument_context` 属于 agent 层。
 3. **news / sentiment 两个分析师在 A 股空转**：无新闻权限、无股吧源，归"新闻与情绪专题"。
 4. **资金面/指数未接 agent**：已注册但无 tool、无分析师使用。
-5. **金融股（银行/保险/券商）字段**：使用通用字段集，部分字段为空；行业级字段映射未做。
-6. **北交所**：无 Yahoo 备源；北交所日历本账号不可用，沿用 SSE。
-7. **YTD 语义**：利润表/现金流量表是本年累计，跨季不能直接相减；表头已标注。
-8. **限流/缓存是进程内 + 磁盘**，多进程并发回测仍可能撞配额。
+5. **指数成分与权重**：`index_weight` 只给代码与权重（不含名称），需要名称时再查 `stock_basic`。
+6. **金融股（银行/保险/券商）字段**：使用通用字段集，部分字段为空；行业级字段映射未做。
+7. **北交所**：无 Yahoo 备源；北交所日历本账号不可用，沿用 SSE。
+8. **YTD 语义**：利润表/现金流量表是本年累计，跨季不能直接相减；表头已标注。
+9. **限流/缓存是进程内 + 磁盘**（内存有上限，会淘汰过期文件），多进程并发回测仍可能撞配额。
+10. **挂单/成交模型**：`get_top_list` 等资金面接口只有原始表格，没有"解读"，接 agent 时再说。

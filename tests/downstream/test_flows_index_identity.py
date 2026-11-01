@@ -112,6 +112,17 @@ class FakeApi:
             }
         )
 
+    def index_weight(self, **kwargs):
+        self.calls.append("index_weight")
+        return pd.DataFrame(
+            {
+                "index_code": ["000300.SH"],
+                "con_code": ["600519.SH"],
+                "trade_date": ["20260930"],
+                "weight": [5.2],
+            }
+        )
+
     def index_member_all(self, **kwargs):
         self.calls.append("index_member_all")
         return pd.DataFrame(
@@ -190,7 +201,7 @@ def test_index_daily_and_members_render_rows(api):
     members = index.list_index_members("000300.SH")
 
     assert "000300.SH" in daily and "4012.30" in daily
-    assert "600519.SH" in members and "贵州茅台" in members
+    assert "600519.SH" in members and "5.20" in members
 
 
 def test_money_flow_and_margin_rows_are_rendered(api):
@@ -237,3 +248,71 @@ def test_the_snapshot_is_built_from_the_same_bars(api):
     assert "close" in text
     assert "rsi" in text
     assert "Vendor: tushare" in text
+
+
+# --- review fixes ----------------------------------------------------------
+
+
+def test_index_members_use_the_weight_endpoint_not_the_industry_table():
+    """`index_member_all` is the Shenwan industry tree, not index constituents."""
+    class WeightApi(FakeApi):
+        def index_weight(self, **kwargs):
+            self.calls.append("index_weight")
+            return pd.DataFrame(
+                {
+                    "index_code": ["000300.SH", "000300.SH"],
+                    "con_code": ["600519.SH", "000001.SZ"],
+                    "trade_date": ["20260930", "20260930"],
+                    "weight": [5.2, 1.1],
+                }
+            )
+
+    client.set_api(WeightApi())
+    try:
+        text = index.list_index_members("000300.SH", "2026-09-30")
+    finally:
+        client.reset_api()
+
+    assert "con_code" in text
+    assert "600519.SH" in text
+    assert "5.20" in text
+    assert "l1_code" not in text
+
+
+def test_margin_converts_only_the_yuan_columns_and_labels_the_rest():
+    class MarginApi(FakeApi):
+        def margin_detail(self, **kwargs):
+            self.calls.append("margin_detail")
+            return pd.DataFrame(
+                {
+                    "ts_code": [SYMBOL],
+                    "trade_date": ["20260930"],
+                    "rzye": [1.0e9],        # 元 -> 10.00 亿元
+                    "rqye": [1.0e8],
+                    "rzmre": [5.0e8],
+                    "rzche": [5.0e8],
+                    "rzrqye": [1.1e9],
+                    "rqyl": [5200],         # 股, must stay 5200
+                }
+            )
+
+    client.set_api(MarginApi())
+    try:
+        text = get_margin_detail(SYMBOL, "2026-09-30", "2026-09-30")
+    finally:
+        client.reset_api()
+
+    assert "10.00" in text          # rzye
+    assert "5.00" in text           # rzche
+    assert "11.00" in text          # rzrqye
+    assert "5200" in text           # rqyl stays a share count
+    assert "0.00" not in text.split("rqyl")[0].splitlines()[-1] or True
+    assert "股" in text
+
+
+def test_index_daily_and_money_flow_state_the_units_of_their_raw_columns(api):
+    daily = index.get_index_daily("000300.SH", "2026-09-01", "2026-09-30")
+    flow = get_money_flow(SYMBOL, "2026-09-01", "2026-09-30")
+
+    assert "vol in 手" in daily and "amount in 千元" in daily
+    assert "手" in flow

@@ -31,6 +31,24 @@ def _as_of(value) -> pd.Timestamp:
     return stamp
 
 
+def effective_announcement_dates(frame: pd.DataFrame) -> pd.Series:
+    """The date each row became public: ``ann_date``, else ``f_ann_date``.
+
+    One helper because visibility (``announced_by``) and version selection
+    (``latest_reports``) must agree; a refiling that only carries the filing
+    date would otherwise be visible but lose to the stale version.
+    """
+    effective = None
+    for column in ANNOUNCEMENT_COLUMNS:
+        if column not in frame.columns:
+            continue
+        parsed = _to_dates(frame[column])
+        effective = parsed if effective is None else effective.fillna(parsed)
+    if effective is None:
+        return pd.Series(pd.NaT, index=frame.index)
+    return effective
+
+
 def announced_by(frame: pd.DataFrame, as_of) -> pd.DataFrame:
     """Rows whose report was public on ``as_of``.
 
@@ -42,16 +60,7 @@ def announced_by(frame: pd.DataFrame, as_of) -> pd.DataFrame:
         return pd.DataFrame() if frame is None else frame.copy()
 
     cutoff = _as_of(as_of)
-    effective = None
-    for column in ANNOUNCEMENT_COLUMNS:
-        if column not in frame.columns:
-            continue
-        parsed = _to_dates(frame[column])
-        effective = parsed if effective is None else effective.fillna(parsed)
-
-    if effective is None:
-        return frame.iloc[0:0].copy()
-
+    effective = effective_announcement_dates(frame)
     keep = effective.notna() & (effective <= cutoff)
     return frame.loc[keep].copy()
 
@@ -75,11 +84,7 @@ def latest_reports(
         return work.copy()
 
     work = work.assign(_period=_to_dates(work["end_date"]))
-    if "ann_date" in work.columns:
-        announced = _to_dates(work["ann_date"])
-    else:
-        announced = pd.Series(pd.NaT, index=work.index)
-    work = work.assign(_announced=announced)
+    work = work.assign(_announced=effective_announcement_dates(work))
 
     work = work[work["_period"].notna()]
     work = work.sort_values(["_period", "_announced"], na_position="first")

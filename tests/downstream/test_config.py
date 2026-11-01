@@ -131,3 +131,12 @@ def test_an_explicit_vendor_choice_beats_the_strict_chain():
 def test_an_invalid_strict_flag_fails_at_startup():
     with pytest.raises(ValueError, match="TRADINGAGENTS_CN_STRICT_ASHARE"):
         cn_config.apply(environ={"TRADINGAGENTS_CN_STRICT_ASHARE": "maybe"})
+
+
+def test_an_environment_pin_beats_a_caller_override():
+    merged = cn_config.apply(
+        {"cn_strict_ashare": False}, environ={"TRADINGAGENTS_CN_STRICT_ASHARE": "1"}
+    )
+
+    assert merged["cn_strict_ashare"] is True
+    assert merged["data_vendors"]["technical_indicators"] == "tushare"

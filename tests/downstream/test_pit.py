@@ -95,3 +95,20 @@ def test_latest_reports_limits_the_number_of_periods():
     )
 
     assert list(latest_reports(frame, periods=2)["revenue"]) == [4, 5]
+
+
+def test_a_refiling_that_only_carries_the_filing_date_wins():
+    """The f_ann_date fallback must also drive dedupe, not only visibility."""
+    frame = pd.DataFrame(
+        {
+            "end_date": ["20260630", "20260630"],
+            "ann_date": ["20260825", None],
+            "f_ann_date": ["20260825", "20261020"],
+            "revenue": [1, 2],
+        }
+    )
+
+    visible = announced_by(frame, "20261231")
+    out = latest_reports(visible, periods=1)
+
+    assert list(out["revenue"]) == [2]
