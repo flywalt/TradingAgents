@@ -16,7 +16,6 @@ import pytest
 from tradingagents.dataflows import router
 from tradingagents.dataflows.config import run_config
 from tradingagents.dataflows.errors import VendorUnavailableError
-
 from tradingagents_cn.bootstrap import (
     bootstrap as boot,
     ensure_bootstrapped,

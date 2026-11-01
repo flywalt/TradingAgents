@@ -16,7 +16,9 @@ from tradingagents_cn.vendors.common import no_rows, require_ashare
 from tradingagents_cn.vendors.tushare import client
 
 _TTL_SECONDS = 24 * 60 * 60
-_FIELDS = "ts_code,name,area,industry,market,list_date"
+_FIELDS = "ts_code,name,area,industry,market,list_date,delist_date,list_status"
+
+_EXCHANGE = {"SH": "SSE", "SZ": "SZSE", "BJ": "BSE"}
 
 
 def resolve_identity(symbol: str) -> dict:
@@ -45,7 +47,37 @@ def resolve_identity(symbol: str) -> dict:
         "area": str(row.get("area") or "").strip(),
         "market": str(row.get("market") or "").strip(),
         "list_date": _iso_or_empty(row.get("list_date")),
+        "delist_date": _iso_or_empty(row.get("delist_date")),
+        "list_status": str(row.get("list_status") or "").strip(),
     }
+
+
+def resolve_identity_at(symbol: str, as_of: str) -> dict:
+    """Identity for a run dated ``as_of``, or ``{}`` when the instrument did not exist.
+
+    Tushare serves today's profile, so the only point-in-time facts available are
+    the listing and delisting dates. A run dated before listing or after
+    delisting therefore gets no identity at all rather than today's name attached
+    to a company that did not trade then. Names and industries are current values
+    and are labelled as such by upstream's ``build_instrument_context`` when the
+    run is historical.
+    """
+    identity = resolve_identity(symbol)
+    listed = identity.get("list_date") or ""
+    delisted = identity.get("delist_date") or ""
+    as_of_compact = str(as_of).replace("-", "")[:8]
+
+    if listed and as_of_compact < listed.replace("-", ""):
+        return {}
+    if delisted and as_of_compact > delisted.replace("-", ""):
+        return {}
+    identity["exchange"] = _EXCHANGE.get(symbol.split(".")[-1].upper(), "")
+    identity["identity_as_of"] = _compact(as_of)
+    return identity
+
+
+def _compact(value: str) -> str:
+    return str(value).replace("-", "")[:8]
 
 
 def format_identity(identity: dict) -> str:
