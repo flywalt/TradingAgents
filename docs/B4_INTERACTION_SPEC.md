@@ -1,150 +1,281 @@
-# B4_INTERACTION_SPEC.md — 上游交互契约与 Web 接入设计
+# B4_INTERACTION_SPEC.md — Web 接入规范（自审后修订版）
 
-> 目的：先固定"上游怎么被使用、产出什么"，再设计 Web。所有条目均来自代码（`cli/`、`graph/`、`reporting.py`、`memory/`），不是推测。
+> 状态：**实现前定稿**。读者是没参与本项目的工程师，照着即可实现。
+> 本文所有上游行为均与代码核对过；与代码冲突处以本文「决策记录」（§13）为准，并说明理由。
 
-## 1. 上游的交互流程（CLI 一条命令 = 一次分析）
+## 0. 范围
+
+- **做**：局域网单用户 Web；一次分析 = 一个后台任务；表单 → 进度 → 报告 → 历史。
+- **不做**：多用户/权限、回测 UI、记忆页、模型/密钥选择、任务取消、token 级流式、报告编辑、**加密/期货等非股票资产**。
+- **不改上游**：新增顶层包 `tradingagents_web/`；上游文件零修改；依赖只进 `requirements-downstream.txt`。
+
+## 1. 上游契约（核对后的准确版本）
 
 ```
-tradingagents [analyze]
-  ├─ 缺参数且有终端 → 交互问答：ticker → 资产类型(自动) → 日期 → 分析师(≥1)
-  ├─ 缺参数且无终端 → 打印缺失的 TRADINGAGENTS_* 变量后退出
-  ├─ 组装 config：环境变量 → 选择结果 → --checkpoint/--no-checkpoint 覆盖
-  ├─ 目录：<results_dir>/<ticker>/<date>/ ，内含 reports/ 与 message_tool.log
-  ├─ 重建 graph（如需 checkpoint）→ begin_checkpoint() 得 thread_id
-  ├─ stream_run(initial_state)：stream_mode=["values","tasks"]
-  │    逐节点推送：agent 状态(pending/running/completed)、messages、分析师的报告
-  ├─ 成功：记录决策（memory log pending 条目）→ clear_checkpoint_on_success()
-  └─ 收尾：rating=run_rating(final_state)（5 档或 REVIEW）
-        ├─ REVIEW → 黄字警告"本次不构成仓位，需人工复核"
-        └─ 询问/按 flags：是否保存报告、是否全文展示、是否生成 HTML
+analyze: ticker/date/analysts → config → 目录 → (可选)checkpoint
+  → stream_run → 成功: record_decision(记忆) + clear_checkpoint_on_success()
+  → rating = run_rating(最终 state)  # 五档 或 REVIEW("读不出"，非第六档)
 ```
 
-**关键语义**：一次运行是**分钟级**的同步过程；失败时 checkpoint 保留以便续跑；成功才清理。
-`REVIEW` 不是第 6 档评级，是"读不出评级"的信号。
+| 输入 | 约束 |
+| --- | --- |
+| ticker | 必填；**Web v1 只支持股票**（`asset_type="stock"`） |
+| date | `YYYY-MM-DD`；上游只校验"≤ 今天"，Web 另加下限 1990-01-01 |
+| analysts | ≥1，子集 `market/social/news/fundamentals` |
+| portfolio | 可选 `PortfolioContext`（`cash/currency/positions[]`）；**不提供 ≠ 空仓** |
+| checkpoint | 服务端配置；Web 注入 thread_id，正文不暴露 |
+| 模型/供应商/密钥 | 环境变量；**不进浏览器** |
 
-## 2. 输入清单（Web 表单要覆盖的）
+**产出（上游默认）**：`save_reports()` 不传 `save_path` 时写入
+`<results_dir>/reports/<ticker>_<时间戳>/`（`trading_graph.py:288`）。
+Web **必须显式传 `save_path`**，否则无法按任务定位。
 
-| 输入 | 上游事实 | Web v1 处理 |
+Web 的运行目录（**本规范定义**）：
+
+```
+<results_dir>/<safe_ticker>/<date>/runs/<run_id>/
+├── report/                 # save_reports(save_path=...) 的目标
+│   ├── 1_analysts/ … 5_portfolio/  complete_report.md/html
+│   └── run_metadata.json   # 仅 CN profile（子类写入）
+├── job.json                # Web 写入：请求参数 + profile + 版本 + 评级
+└── web.log                 # Web 写入：异常堆栈、耗时（不进事件流）
+```
+
+- `<results_dir>` 取自 `graph.config["results_dir"]`（**由 factory 按 profile 决定**，Web 不覆盖）；
+- 同标的同日期重跑 → **新 run_id 目录**，不覆盖历史（上游 `write_report_tree` 会清理目录内旧文件，
+  所以每次运行必须独立目录）；
+- `message_tool.log` **不由 Web 产生**（它是 CLI 显示层的产物），不在本规范输出清单内。
+
+## 2. 包结构与依赖
+
+```
+tradingagents_web/
+├── __main__.py   # python -m tradingagents_web，uvicorn 单 worker
+├── app.py        # create_app、路由、鉴权、模板
+├── db.py         # SQLite schema + PRAGMA user_version 迁移
+├── jobs.py       # CRUD、状态迁移、事件、启动恢复
+├── worker.py     # 单线程队列 + 执行循环
+├── runner.py     # 任务 → build_graph → 回调/values → 事件 → 保存
+├── errors.py     # 异常 → category/message/action
+├── security.py   # token、cookie、路径白名单
+├── checkpoints.py# 按标的清理检查点（脆弱耦合，见 §8）
+├── templates/ static/
+```
+
+依赖 `fastapi`、`uvicorn[standard]`、`jinja2`；无 Node；不加 console_script。
+
+## 3. 数据模型（SQLite，单库）
+
+**单库路径**：`TRADINGAGENTS_WEB_DB`，默认 `~/.tradingagents/web/state.db`。
+**不放在 `<results_dir>` 下**：results 目录按 profile 分叉，会把历史拆成两个库。
+
+```sql
+runs(
+  id TEXT PRIMARY KEY, symbol TEXT, market TEXT, profile TEXT,
+  trade_date TEXT, analysts TEXT,        -- JSON array
+  language TEXT, strict INTEGER,
+  portfolio_json TEXT,                   -- 已验证的 JSON；NULL=未提供
+  status TEXT,                           -- queued|running|succeeded|failed
+  rating TEXT,                           -- 五档|REVIEW|NULL
+  error_category TEXT, error_message TEXT,
+  run_dir TEXT, report_path TEXT,
+  created_at TEXT, started_at TEXT, finished_at TEXT
+);
+events(id INTEGER PRIMARY KEY AUTOINCREMENT, run_id TEXT, seq INTEGER,
+       kind TEXT, payload TEXT, created_at TEXT);
+CREATE INDEX idx_runs_status ON runs(status, created_at);
+CREATE INDEX idx_runs_symbol ON runs(symbol, trade_date);
+CREATE UNIQUE INDEX idx_events ON events(run_id, seq);
+```
+
+- 启动恢复：`running` → `failed(interrupted)`；`queued` 按 `created_at` 重新入队。
+- 事件上限 5,000/任务，超出丢最旧的非状态事件。
+
+## 4. 状态机与 worker
+
+```
+POST /api/runs → 校验 → INSERT(queued) → put(id) → 202 {id, position}
+worker: running(started_at) → execute → succeeded | failed
+```
+
+- 并发：1 运行 + 3 排队；满 → `409 queue_full`。
+- **不复用 Graph**：每任务 `build_graph()`（与 CLI 一致，避免 checkpoint/配置串扰）。
+- 不自动重试；"重新运行"生成新 id。
+- 进程退出：`running` 标 `failed(interrupted)`；不自动续跑。
+
+## 5. 执行序列（`runner.py`，与上游一致）
+
+```python
+profile = select_profile(symbol=job.symbol, market=job.market)   # 仅用于校验/展示
+graph   = build_graph(job_overrides, symbol=job.symbol, market=job.market)
+# ↑ 必须传原始 overrides；factory 以 symbol/market 为准选择 profile
+config  = graph.config
+state   = graph.create_run_state(job.symbol, job.trade_date,
+                                 asset_type="stock", portfolio=portfolio)
+args    = graph.propagator.get_graph_args(callbacks=[progress])
+tid     = graph.begin_checkpoint(job.symbol, job.trade_date, "stock", portfolio) if config["checkpoint_enabled"] else None
+if tid: args.setdefault("config", {}).setdefault("configurable", {})["thread_id"] = tid
+final = {}
+try:
+    for _messages, chunk in graph.stream_run(state, **args):
+        if isinstance(chunk, dict): final.update(chunk)     # values 是累积 state
+        progress.emit_from_callbacks()                       # 见 §5.1
+    graph.save_reports(final, job.symbol, save_path=run_dir/"report")   # 先落盘
+    graph.record_decision(final, job.trade_date, job.symbol)            # 再写记忆
+    graph.clear_checkpoint_on_success(job.symbol, job.trade_date, "stock", portfolio)
+finally:
+    if tid: graph.end_checkpoint()
+rating = run_rating(final)                                   # 五档 or REVIEW
+```
+
+- **顺序偏离 CLI**：CLI 先记忆后报告；Web 先报告后记忆——报告写失败时不应留下"有决策无报告"的记忆条目。
+- `portfolio` 必须同时传给 `create_run_state` / `begin_checkpoint` / `clear_checkpoint_on_success`
+  （它的 fingerprint 参与 checkpoint 签名）。
+- 脏工作区 + `checkpoint_enabled` → `build_graph` 抛 `RuntimeError` → `config_blocked`（见 §10）。
+- `report_write` 失败：`failed(report_write)`，评级仍写入 DB。
+
+### 5.1 进度事件来源（**回调，不靠 tasks**）
+
+上游 `stream_run` 只在子图**完成后**产出 task chunk，且顶层 task 被丢弃（`trading_graph.py:418-436`），
+因此节点开始/结束**只能**来自 callback：
+
+- `on_chain_start/end` 读 `metadata["langgraph_node"]`；
+- 只映射**上游节点词表**（`graph/setup.py`）：`Market Analyst`、`Sentiment Analyst`、`News Analyst`、
+  `Fundamentals Analyst`、`Memory Log`、`Bull Researcher`、`Bear Researcher`、`Research Manager`、
+  `Trader`、`Aggressive Analyst`、`Conservative Analyst`、`Neutral Analyst`、`Portfolio Manager`；
+- 子图内的 `agent` / `tools` / `wrap_up` 不单列，归属到其父分析师（由 `langgraph_checkpoint_ns` 前缀判定）；
+- 其余节点（模型、工具）忽略。
+
+事件：
+
+| 事件 | 触发 | payload |
 | --- | --- | --- |
-| `ticker` | 必填；上游会做代码校验；资产类型自动识别（stock/crypto） | 必填；输入时调用预览接口显示**规范化代码 + 市场 Profile**；歧义（4~5 位纯数字）要求选市场 |
-| `date` | 必填；`YYYY-MM-DD`；不得晚于今天 | 日期控件 + 服务端校验 |
-| `analysts` | 至少 1 个，子集 `market/social/news/fundamentals` | 多选，默认全选 |
-| `portfolio` | 可选 JSON：`cash`、`currency`、`positions[{ticker, quantity, average_price}]`；不提供 ≠ 空仓 | v1 只支持**粘贴/上传 JSON**，不做编辑器；提供 schema 校验错误 |
-| `checkpoint` | 三态：flag / env / 默认 | v1 固定按服务端配置（默认开），UI 只提供"强制全新运行"（清本 ticker 检查点） |
-| `--clear-checkpoints` | 删除所有检查点 | 提供"清检查点"按钮（明确二次确认） |
-| `save/show/html` | 三态，交互式询问 | Web 总是保存；`show` 变成"打开报告页"；`html` 默认开 |
-| 模型/供应商/端点 | 环境变量与 prefs；含密钥 | **v1 不暴露**（避免密钥进浏览器）；只暴露 `output_language` 与 `--strict`（CN） |
-| 回测参数 | tickers/start/end/every/analysts/asset_type/portfolio/run_id | **v1 不做** |
+| `run.started` | worker 开始 | `{symbol, date, profile}` |
+| `node.started/finished` | 回调 | `{node}` |
+| `report.ready` | `values` 首次出现 truthy 的 `*_report` / `investment_plan` / `trader_investment_plan` / `final_trade_decision` | `{key}` |
+| `run.finished` | 成功 | `{rating, report_url, final: true}` |
+| `run.failed` | 异常 | `{category, message, final: true}` |
 
-## 3. 输出清单（Web 要呈现/落盘的）
+**v1 不推 message 文本**：来源里的 agent 归属已被上游丢弃，且推送 prompt 内容有泄漏风险。
 
-| 输出 | 位置/形态 | Web v1 |
-| --- | --- | --- |
-| 实时进度 | 节点级：agent 状态、messages | SSE：`node_started` / `node_finished` / `message` |
-| 最终评级 | `run_rating(final_state)`：Buy/Overweight/Hold/Underweight/Sell/**REVIEW** | 结果页顶部；REVIEW 显示警告条（不能当静默成功） |
-| 报告树 | `reports/1_analysts/… 5_portfolio/`、`complete_report.md` | 列出章节；正文用 HTML 版 |
-| HTML 报告 | `reports/complete_report.html` | 直接内嵌/跳转展示 |
-| 运行元数据 | `reports/run_metadata.json` + md/html 章节 | 详情页折叠展示（11 字段） |
-| 消息/工具日志 | `<ticker>/<date>/message_tool.log` | 仅提供下载，不在页面渲染 |
-| 检查点 | `<data_cache_dir>/checkpoints/<TICKER>.db` | 不在 UI 暴露路径，只提供"清除" |
-| 记忆条目 | `memory_log_path`：`[date | ticker | rating | pending]` | v1 不做记忆页 |
-| CLI 偏好 | `~/.tradingagents/cli_prefs.json` | Web 不使用（避免与 CLI 互相覆盖） |
+## 6. HTTP API
 
-## 4. Web 设计决定（v1）
-
-### 4.1 表单（单页）
-
-```
-标的 [600519.SH      ]  → 预览：CN_A_SHARE · 贵州茅台（Tushare 身份）
-日期 [2026-10-30]
-分析师 [x] market [x] social [x] news [x] fundamentals
-语言   [中文/English]
-严格模式 [ ]（仅 CN_A_SHARE 可选；海外标的隐藏）
-组合 JSON（可选，折叠）
-[开始分析]
-```
-
-- **预览接口** `GET /api/preview?symbol=…&market=…`：返回规范化代码、Profile、身份名；
-  歧义/冲突返回 400 与可读原因（不猜市场）。
-- 严格模式对 `UPSTREAM_DEFAULT` **隐藏并拒绝**（与后端一致）。
-
-### 4.2 状态机
-
-```
-queued → running → succeeded | failed
-```
-
-- 单 worker 串行；队列上限 3；
-- 失败区分：`vendor_unavailable` / `no_data` / `config_error` / `internal`（都在任务页显示原始消息）；
-- 不做"取消"（v1）：上游是同步长任务，中断语义需要进程级处理，留到 W3。
-
-### 4.3 API 草案
+除 `/healthz` 外均需鉴权。
 
 | 方法 | 路径 | 说明 |
 | --- | --- | --- |
-| GET | `/api/preview` | 代码规范化 + Profile + 身份 |
-| POST | `/api/runs` | `{symbol, date, analysts, language, strict, portfolio?}` → `{id}` |
-| GET | `/api/runs/{id}` | 状态、评级、错误、报告路径 |
-| GET | `/api/runs/{id}/events` | SSE 进度 |
-| GET | `/runs/{id}/report` | 报告页（内嵌 HTML） |
-| GET | `/runs/{id}/files/{name}` | 白名单下载（`complete_report.md`、`message_tool.log`） |
-| POST | `/api/checkpoints/clear` | 清检查点（二次确认在 UI） |
+| GET | `/api/preview?symbol=&market=` | 200 `{symbol, market, profile, name}`；400 `{error}` |
+| POST | `/api/runs` | 202 `{id, position}`；400/409 |
+| GET | `/api/runs/{id}` | 状态、评级、错误、报告 URL |
+| GET | `/api/runs` | 过滤 `symbol/status/rating` + 分页 |
+| GET | `/api/runs/{id}/events` | SSE（`Last-Event-ID` 补发） |
+| POST | `/api/runs/{id}/rerun` | 202 新 id |
+| POST | `/api/checkpoints/clear` | `{symbol}` → `{cleared}`（见 §8） |
 
-### 4.4 安全（局域网 ≠ 可信）
+页面：`/`、`/runs/{id}`、`/history`、`/runs/{id}/report`、`/runs/{id}/files/{name}`。
 
-- 共享 token（`TRADINGAGENTS_WEB_TOKEN`），未带 → 401；cookie 记住；
-- 一次分析会真实产生 LLM 费用：队列上限 + 表单"开始"二次确认；
-- 报告文件只读白名单 + `safe_ticker_component` 路径校验；
-- 绑定 `0.0.0.0` 但文档写明仅内网，不映射公网。
+### 6.1 校验（服务端权威）
 
-## 5. 与多市场 Profile 的关系
-
-- Web 不在前端写死任何 A 股假设：Profile 由**服务端** `select_profile(symbol, market)` 决定，
-  前端只展示结果；
-- 结果页显示 `profile`、`extension_version`、`upstream/downstream commit`（来自 `run_metadata.json`）；
-- 海外标的的分析走**上游类**，UI 不得显示 A 股约束（前端不生成这些文案，全部来自报告/元数据）。
-
-## 6. v1 明确不做
-
-多用户/权限、回测 UI、记忆页、模型与密钥选择、任务取消、token 级流式输出、报告在线编辑。
-
-## 7. 验收（W1）
-
-1. 手机浏览器打开 → 输入 `600519.SH`，预览显示 `CN_A_SHARE` 与公司名；
-2. 开始分析 → 页面显示节点进度 → 完成后显示评级与报告；
-3. 输入 `0700.HK` → 预览显示 `UPSTREAM_DEFAULT`，严格模式不可选；
-4. 输入 `0700` → 预览报错"无法判定市场，请选择"；
-5. 刷新页面后历史任务仍在（SQLite）；
-6. 未带 token 的请求返回 401。
-
-
-## 8. 参考 TradingAgents-CN 的 Web 层：采纳与不采纳
-
-只读核对 `hsliuping/TradingAgents-CN@51060a7` 的 Web 实现，结论如下（不改本规范的前 7 节，只增补）。
-
-### 8.1 值得采纳（成本低、对单用户也成立）
-
-| 优化点 | 他们的做法（证据） | 我们的 W1 做法 |
+| 字段 | 规则 | category |
 | --- | --- | --- |
-| **错误分类 + 用户可读消息** | `app/utils/error_formatter.py`：把异常分为 LLM key/网络/配额/内容审核、数据源 key/网络/无数据、代码无效、系统等类别，并给出下一步 | `web/errors.py`：`category + message + action`；失败页按类别显示，原始堆栈只进日志 |
-| **SSE 心跳与重连** | `app/routers/sse.py`：`event: connected`、心跳间隔、最大空闲时间 | SSE 带 `id:`、`retry:` 与心跳；断线用 `Last-Event-ID` 从 SQLite 补发（不需要 Redis） |
-| **合规术语** | `app/routers/analysis.py::normalize_result_data`：BUY/SELL/HOLD → 乐观/审慎/中性，推荐语不含具体价格 | 结果页展示"乐观/审慎/中性"，并固定一行"非投资建议，仅供研究"；报告正文不改 |
-| **历史检索** | `AnalysisHistoryQuery` + 任务表 | 按 ticker / 日期 / 状态 / 评级过滤 + 分页（SQLite 索引） |
-| **排队可见性** | 队列服务返回位置与并发限制 | 单 worker 下显示"第 N 位 + 预计等待"（用历史平均时长） |
-| **运行参数快照** | 任务记录带参数 | 结果页读 `run_metadata.json`（profile / vendors / 版本 / 时间） |
+| symbol | 非空 ≤20、无路径字符；`select_profile` 成功 | `symbol_ambiguous`/`symbol_conflict`/`symbol_invalid` |
+| date | ISO，`1990-01-01 ≤ date ≤ 今天`（下限是 Web 规则） | `bad_date` |
+| analysts | 非空、子集 | `no_analysts`/`unknown_analyst` |
+| language | `English`/`中文` | `bad_language` |
+| strict | 仅 `profile=CN_A_SHARE` | `strict_not_allowed` |
+| portfolio | `PortfolioContext.model_validate`；`null` 与 `{}` 语义不同 | `portfolio_invalid` |
+| asset | v1 仅股票；crypto/期货 → 400 | `unsupported_asset` |
 
-### 8.2 明确不采纳
+## 7. SSE
 
-| 他们的做法 | 原因 |
+- 每条 `id: <seq>`、`retry: 3000`；`data:` 单行 JSON `{seq, kind, at, ...}`。
+- 心跳 `: ping` 每 10s（不占 seq）。
+- 重连带 `Last-Event-ID` → 从 SQLite 补发 `seq > id`。
+- 结束发 `final: true` 后关流；30s 空闲关流。
+
+## 8. 安全
+
+1. `TRADINGAGENTS_WEB_TOKEN` 缺失 → 拒绝启动（`--dev-no-token` 仅允许 127.0.0.1）。
+2. `compare_digest`；`HttpOnly; SameSite=Lax` cookie；失败 401。
+3. 状态变更仅 POST；带 `X-Requested-With: fetch`。
+4. 文件访问：`resolve()` 必须在 `run_dir` 内，扩展名 ∈ `{.html,.md,.json,.log}`；
+   报告 HTML 以 `Content-Security-Policy: sandbox; default-src 'none'; style-src 'unsafe-inline'` 返回。
+5. 日志脱敏：token/key/请求头不入库、不落日志。
+
+**检查点清理（脆弱耦合）**：上游没有"按标的清理"的公开 API（`clear_checkpoint` 需要 ticker+date+签名，
+签名是整份配置的哈希）。Web 的 `checkpoints.py` 自行构造
+`<data_cache_dir>/checkpoints/<safe_ticker>.db`（含 `-wal/-shm`）删除，并：
+- 在 `docs/UPSTREAM_DELTA.md` 脆弱耦合表登记；
+- 由 `tests/downstream/test_web_checkpoints.py` 锁定路径规则。
+
+## 9. 页面（移动优先，服务端渲染）
+
+| 页面 | 内容 |
 | --- | --- |
-| Redis 队列 + 可见性超时 + 多级并发限流 | 单用户单 worker 下是纯负担；SQLite 表足够 |
-| MongoDB 必须依赖 | 我们的隔离原则是"单机可跑"，SQLite 已能表达任务与历史 |
-| SSE + WebSocket 双栈 | 两套推送语义要同步维护，WebSocket 的唯一优势（双向）v1 用不到 |
-| 三套 analysis service（simple/unified/analysis） | 技术债信号：同一能力三种实现，改一处要改三处 |
-| Vue 前端工程化 | 我们的 W1 是服务端渲染，无构建链；移动端够用 |
-| 用户体系 / 权限矩阵 / Pro 版剥离 | 产品层，与"局域网单用户"范围冲突 |
+| `/` | 表单（symbol+预览、date、analysts、语言、strict 仅 CN、portfolio 折叠）+ 最近 10 条 |
+| `/runs/{id}` | 状态、节点时间线、评级 / REVIEW 警告、报告入口、错误卡片（category+action） |
+| `/runs/{id}/report` | iframe 沙箱内嵌 HTML；上方显示 profile、版本、`job.json` 摘要 |
+| `/history` | 过滤 + 分页 |
 
-### 8.3 对本轮范围的影响
+合规展示：`Buy/Overweight/Hold/Underweight/Sell` → **乐观/中性/审慎**，固定"仅供研究，不构成投资建议"。
+只改展示，不改报告正文。
 
-新增四项**低成本**改动进 W1：`web/errors.py`、SSE 心跳与重连、结果页合规术语、历史过滤。
-其余保持 §4 的 API 与状态机不变。W1 规模从 ~500 行升至 ~650 行，仍可控。
+## 10. 错误分类
+
+| category | 消息要点 | 下一步 |
+| --- | --- | --- |
+| `symbol_*` / `bad_date` / `no_analysts` / `unknown_analyst` / `bad_language` / `portfolio_invalid` / `unsupported_asset` | 输入错误 | 修正后重试 |
+| `strict_not_allowed` | 严格模式仅 A 股 | 关闭 strict |
+| `queue_full` | 队列已满（1 跑 + 3 排） | 稍后 |
+| `config_blocked` | 检查点开启但工作区有未提交修改 / profile 冲突 | 清理工作区或关检查点 |
+| `llm_auth` / `llm_quota` | 模型凭证/限流 | 检查 `.env`；稍后 |
+| `vendor_unconfigured` / `vendor_unavailable` / `no_data` | 数据源未配置 / 暂不可用 / 无数据 | 配置 token；换日期或标的 |
+| `report_write` | 磁盘/权限 | 检查目录 |
+| `interrupted` | 服务重启 | 重新运行 |
+| `internal` | 未预期 | 看 `web.log` |
+
+## 11. 配置与隔离
+
+- Web **不预合并配置**：把原始 overrides 交给 `build_graph(overrides, symbol=…, market=…)`，
+  由 factory 决定 profile、vendor 链与 `results_dir`（CN → `profile-cn`）；
+- 浏览器只能覆盖 `language`、`strict`；
+- 单库固定路径；运行目录按 profile 落在各自 `results_dir` 下；
+- 与 CLI 一致：不共享 Graph、不共享进程级默认配置。
+
+## 12. 测试计划（离线）
+
+| 层 | 用例 |
+| --- | --- |
+| 校验 | 每个 category 至少 1 例（`0700` 歧义、`US+600519.SS` 冲突、strict on US、crypto 拒绝） |
+| 鉴权 | 无/错 token 401；cookie；`--dev-no-token` 仅 127.0.0.1 |
+| 任务 | 入队→running→succeeded（假 Graph）；失败分类；队列满 409；rerun 新 id |
+| 恢复 | `running→failed(interrupted)`；`queued` 重排 |
+| SSE | seq 顺序、`Last-Event-ID` 补发、心跳、结束关闭 |
+| 安全 | 路径穿越拒绝；CSP 头；日志无 token |
+| 视图 | 首页/详情/历史 200；REVIEW 警告；合规术语 |
+| 检查点 | 按 symbol 删除 `*.db/-wal/-shm`（脆弱耦合测试） |
+| 隔离 | CN 与默认 profile 的 `run_dir` 在不同 results 根下 |
+| 回归 | 预合并配置 + 非 CN symbol 不得被误判（factory 优先级） |
+
+验收：手机浏览器完成 `600519.SH`；`0700.HK` 显示默认 profile 且无 strict；`0700` 报歧义；
+刷新后历史仍在；无 token 401。
+
+## 13. 决策记录（含自审修订）
+
+| # | 决策 | 理由 |
+| --- | --- | --- |
+| 1 | Web 传**原始 overrides**；`build_graph` 以 symbol/market 覆盖配置里的 profile；同时修复 factory 优先级与 CLI/Batch 的同类缺陷 | 预合并的 CN 配置会让 `0700.HK`/`AAPL` 直接抛错（自审实测） |
+| 2 | 每次运行独立 `run_dir`（含 run_id），显式 `save_path` | 上游默认时间戳目录不可按任务定位；复用目录会被 `write_report_tree` 清理 |
+| 3 | 节点事件用 **callback**（`langgraph_node`），不用 `tasks` | `stream_run` 不产顶层 task，子图 task 仅在完成后出现 |
+| 4 | 执行序列：stream → 合并 values → 保存报告 → 写记忆 → 清检查点；`finally` 关检查点 | 报告失败不应留下记忆条目；检查点必须成对释放 |
+| 5 | v1 **不推 message 文本** | 上游已丢弃 agent 归属；推送 prompt 有泄漏风险 |
+| 6 | 检查点清理按 symbol 删 DB，登记脆弱耦合 + 测试 | 上游无按标的清理 API |
+| 7 | v1 仅股票；portfolio 透传到 state/checkpoint | `create_run_state` 有 `asset_type/portfolio` 参数，不传会静默丢失 |
+| 8 | **单库**固定路径；运行目录按 profile 分离 | 库放 results 下会被 profile 分叉成两个历史 |
+| 9 | 模型/密钥不进浏览器；无取消；无回测 | 范围控制；中断/重试需进程级设计 |
+| 10 | 报告 HTML 用 CSP sandbox 返回 | 报告含模型输出，禁止脚本执行 |
+
+## 14. 参考 TradingAgents-CN
+
+采纳：错误分类器、SSE 心跳/重连、合规术语、历史过滤、排队可见性。
+拒绝：Redis 队列、强制 MongoDB、SSE+WebSocket 双栈、三套 analysis service、Vue 构建、用户体系。
