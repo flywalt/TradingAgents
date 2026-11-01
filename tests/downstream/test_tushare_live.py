@@ -69,3 +69,94 @@ def test_live_beijing_symbol_is_served_even_though_yahoo_has_no_listing():
     assert text.startswith("# Stock data for 920002.BJ")
     rows = [line for line in text.splitlines() if line and not line.startswith("#")]
     assert len(rows) > 1, "no Beijing bars returned in the last 60 days"
+
+
+def test_live_indicators_agree_with_a_direct_computation_of_the_same_bars():
+    _skip_without_prerequisites()
+    from tradingagents_cn.vendors.tushare import client
+    from tradingagents_cn.vendors.tushare.indicators import get_stock_stats_indicators_window
+    from tradingagents_cn.vendors.tushare.stock import fetch_bars
+
+    client.reset_api()
+    end = date.today()
+    as_of = (end - timedelta(days=1)).isoformat()
+    text = get_stock_stats_indicators_window(SYMBOL, "close_50_sma", as_of, 5)
+
+    bars = fetch_bars(SYMBOL, (end - timedelta(days=200)).isoformat(), as_of)
+    expected = f"{bars['close'].tail(50).mean():.2f}"
+    served = [line.split(",")[1] for line in text.splitlines() if line and not line.startswith("#")]
+    assert served[-1] == expected
+    assert served[1:]  # the window has more than the last row
+
+
+def test_live_statements_exclude_a_report_announced_after_the_run_date():
+    _skip_without_prerequisites()
+    from tradingagents_cn.vendors.tushare import client
+    from tradingagents_cn.vendors.tushare.statements import get_income_statement
+
+    client.reset_api()
+    # The 2026 Q3 report is announced in late October, so a September run cannot see it.
+    text = get_income_statement(SYMBOL, "quarterly", "2026-09-30")
+
+    assert "| 2026-06-30 |" in text
+    assert "| 2026-09-30 |" not in text
+    assert "单位：亿元" in text
+
+
+def test_live_fundamentals_carry_profile_and_valuation():
+    _skip_without_prerequisites()
+    from tradingagents_cn.vendors.tushare import client
+    from tradingagents_cn.vendors.tushare.fundamentals import get_fundamentals
+
+    client.reset_api()
+    text = get_fundamentals(SYMBOL, date.today().isoformat())
+
+    assert "贵州茅台" in text
+    assert "白酒" in text
+    assert "Total market cap:" in text
+
+
+def test_live_capital_flow_endpoints_answer():
+    _skip_without_prerequisites()
+    from tradingagents_cn.vendors.tushare import client
+    from tradingagents_cn.vendors.tushare.flows import get_margin_detail, get_money_flow
+
+    client.reset_api()
+    end = date.today()
+    start = (end - timedelta(days=20)).isoformat()
+
+    flow = get_money_flow(SYMBOL, start, end.isoformat())
+    margin = get_margin_detail(SYMBOL, start, end.isoformat())
+
+    assert "net_mf_amount" in flow
+    assert "rzye" in margin
+
+
+def test_live_index_and_identity_endpoints_answer():
+    _skip_without_prerequisites()
+    from tradingagents_cn.identity import resolve_identity
+    from tradingagents_cn.vendors.tushare import client
+    from tradingagents_cn.vendors.tushare.index import get_index_daily, list_index_members
+
+    client.reset_api()
+    end = date.today()
+    daily = get_index_daily("000300.SH", (end - timedelta(days=20)).isoformat(), end.isoformat())
+    members = list_index_members("000300.SH")
+    identity = resolve_identity(SYMBOL)
+
+    assert "000300.SH" in daily
+    assert "con_code" in members or "weight" in members
+    assert identity["name"] == "贵州茅台"
+
+
+def test_live_snapshot_uses_tushare_numbers():
+    _skip_without_prerequisites()
+    from tradingagents_cn.snapshot import build_market_snapshot
+    from tradingagents_cn.vendors.tushare import client
+
+    client.reset_api()
+    text = build_market_snapshot(SYMBOL, (date.today() - timedelta(days=1)).isoformat())
+
+    assert text.startswith(f"# Verified market snapshot for {SYMBOL}")
+    assert "Vendor: tushare" in text
+    assert "- rsi:" in text

@@ -53,8 +53,16 @@
 | D-0003 | `7d626cd` `feat(downstream)` | feat | 下游骨架 `tradingagents_cn/`（注册/配置/代码规范化/交易日历/交易规则/适配器公共层）+ `tests/downstream/` 110 个测试（含**同步保险丝**） | 无 | 无 | 全量 `1522 passed, 1 skipped`；`ruff check .` 全绿 |
 | D-0004 | `8d0ffb6` `feat(tushare)` | feat | Tushare 行情 vendor（`get_stock_data`，含 `cn_adjust` 复权）+ `trade_cal` 交易日历 + `docs/TUSHARE.md` + 16 个离线测试 + 2 个 `integration` 冒烟 | 无 | 无 | 全量 `1538 passed, 1 skipped`；integration 需 `TUSHARE_TOKEN` |
 | D-0005 | 本条提交 `test(tushare)` | test/docs | 真实冒烟记录（单位/复权/日历/北交所实测）+ 北交所 integration 用例 + 2 条已知限制 | 无 | 无 | offline `1538 passed`；`-m integration` → **3 passed** |
+| D-0006 | `8fd4a77` `feat(data)` | feat | `units.py`（元→亿元/手→股/千元→元）+ `pit.py`（公告日前视过滤、同期取最新公告） | 无 | 无 | 13 passed |
+| D-0007 | `4ec11dc` `feat(data)` | feat | `cache.py`（内存+磁盘 TTL、原子写）+ 客户端限流 | 无 | 无 | 9 passed |
+| D-0008 | `5fb37c5` `feat(indicators)` | feat | 13 个指标本地计算（同一份 qfq 日线）+ `fetch_bars()` 抽取 | 无 | 无 | 7 passed |
+| D-0009 | `b19eb63` `feat(fundamentals)` | feat | 概况/估值/财务摘要（估值按日、财报按公告日） | 无 | 无 | 8 passed |
+| D-0010 | `d83adc2` `feat(statements)` | feat | CAS 三表（合并报表、防前视、亿元、YTD 标注） | 无 | 无 | 9 passed |
+| D-0011 | `1857fdf` `feat(data)` | feat | 资金面/指数/身份/快照接口 + `register_category()` | 无 | 无 | 10 passed |
+| D-0012 | `43dc4a6` `feat(config)` | feat | `cn_strict_ashare` 单 vendor 链 + 三类 vendor 链扩展 | 无 | 无 | 全量 1599 passed |
+| D-0013 | 本条提交 `test(data)` | test/docs | 9 个真实接口冒烟 + `docs/ASHARE_DATA.md` | 无 | 无 | `-m integration` → 9 passed |
 
-四条下游提交合计新增代码与文档，**0 行上游改动**。下游与上游的唯一耦合是文档里登记的"脆弱耦合"，
+十余条下游提交合计新增代码与文档，**0 行上游改动**。下游与上游的唯一耦合是文档里登记的"脆弱耦合"，
 现在由 `tests/downstream/test_sync_guard.py`（12 组断言）机械锁定。
 
 ### 2.1 已实现的下游文件（D-0003）
