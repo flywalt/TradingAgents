@@ -116,3 +116,35 @@ queued → running → succeeded | failed
 4. 输入 `0700` → 预览报错"无法判定市场，请选择"；
 5. 刷新页面后历史任务仍在（SQLite）；
 6. 未带 token 的请求返回 401。
+
+
+## 8. 参考 TradingAgents-CN 的 Web 层：采纳与不采纳
+
+只读核对 `hsliuping/TradingAgents-CN@51060a7` 的 Web 实现，结论如下（不改本规范的前 7 节，只增补）。
+
+### 8.1 值得采纳（成本低、对单用户也成立）
+
+| 优化点 | 他们的做法（证据） | 我们的 W1 做法 |
+| --- | --- | --- |
+| **错误分类 + 用户可读消息** | `app/utils/error_formatter.py`：把异常分为 LLM key/网络/配额/内容审核、数据源 key/网络/无数据、代码无效、系统等类别，并给出下一步 | `web/errors.py`：`category + message + action`；失败页按类别显示，原始堆栈只进日志 |
+| **SSE 心跳与重连** | `app/routers/sse.py`：`event: connected`、心跳间隔、最大空闲时间 | SSE 带 `id:`、`retry:` 与心跳；断线用 `Last-Event-ID` 从 SQLite 补发（不需要 Redis） |
+| **合规术语** | `app/routers/analysis.py::normalize_result_data`：BUY/SELL/HOLD → 乐观/审慎/中性，推荐语不含具体价格 | 结果页展示"乐观/审慎/中性"，并固定一行"非投资建议，仅供研究"；报告正文不改 |
+| **历史检索** | `AnalysisHistoryQuery` + 任务表 | 按 ticker / 日期 / 状态 / 评级过滤 + 分页（SQLite 索引） |
+| **排队可见性** | 队列服务返回位置与并发限制 | 单 worker 下显示"第 N 位 + 预计等待"（用历史平均时长） |
+| **运行参数快照** | 任务记录带参数 | 结果页读 `run_metadata.json`（profile / vendors / 版本 / 时间） |
+
+### 8.2 明确不采纳
+
+| 他们的做法 | 原因 |
+| --- | --- |
+| Redis 队列 + 可见性超时 + 多级并发限流 | 单用户单 worker 下是纯负担；SQLite 表足够 |
+| MongoDB 必须依赖 | 我们的隔离原则是"单机可跑"，SQLite 已能表达任务与历史 |
+| SSE + WebSocket 双栈 | 两套推送语义要同步维护，WebSocket 的唯一优势（双向）v1 用不到 |
+| 三套 analysis service（simple/unified/analysis） | 技术债信号：同一能力三种实现，改一处要改三处 |
+| Vue 前端工程化 | 我们的 W1 是服务端渲染，无构建链；移动端够用 |
+| 用户体系 / 权限矩阵 / Pro 版剥离 | 产品层，与"局域网单用户"范围冲突 |
+
+### 8.3 对本轮范围的影响
+
+新增四项**低成本**改动进 W1：`web/errors.py`、SSE 心跳与重连、结果页合规术语、历史过滤。
+其余保持 §4 的 API 与状态机不变。W1 规模从 ~500 行升至 ~650 行，仍可控。
