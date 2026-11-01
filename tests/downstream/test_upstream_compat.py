@@ -1,4 +1,8 @@
-"""The sync fuse: pin every upstream surface the downstream layer relies on.
+"""Superset B of the sync guard: upstream compatibility (symbols, signatures, schemas).
+
+Behavioural contracts live in ``test_contract_behavior.py``; checkpoint identity
+lives in ``test_checkpoint_behavior.py``. This file only answers "is the surface
+we depend on still there and still shaped the same?"
 
 Each test here corresponds to a row of the fragile-coupling table in
 ``docs/UPSTREAM_DELTA.md``. When an upstream release changes one of these, the

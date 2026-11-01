@@ -10,7 +10,7 @@ upstream surfaces this package leans on are listed in ``docs/UPSTREAM_DELTA.md``
 and pinned by ``tests/downstream/test_sync_guard.py``.
 """
 
-__version__ = "0.1.0.dev0"
+from ._version import VERSION as __version__
 
 from .bootstrap import (
     RegistrationReport,

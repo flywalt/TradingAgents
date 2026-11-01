@@ -22,6 +22,8 @@ from __future__ import annotations
 import os
 from copy import deepcopy
 
+from tradingagents_cn._version import VERSION as _VERSION
+
 #: Keys this layer owns. The ``cn_`` prefix keeps them apart from upstream's.
 DEFAULT_CN_CONFIG: dict = {
     #: Which market the downstream layer treats as its own.
@@ -37,6 +39,11 @@ DEFAULT_CN_CONFIG: dict = {
     #: Indicator formulas: "tdx" (通达信, what A-share readers compare against)
     #: or "stockstats" (the upstream/Wikipedia set).
     "cn_indicator_flavor": "tdx",
+    #: The downstream extension version. It is part of the run config on
+    #: purpose: upstream hashes the config into the checkpoint thread id, so an
+    #: extension upgrade invalidates stale checkpoints instead of resuming a run
+    #: whose node behaviour changed underneath it.
+    "cn_extension_version": _VERSION,
     #: Strict A-share mode: chains become Tushare-only, so a Tushare outage is
     #: reported as unavailable instead of silently served from Yahoo (a
     #: different price basis). Off by default so US tickers keep working.
@@ -161,6 +168,8 @@ def _validate(config: dict) -> None:
             f"cn_indicator_flavor must be one of {INDICATOR_FLAVORS}, got {flavor!r}"
         )
     config["cn_indicator_flavor"] = flavor
+    version = str(config.get("cn_extension_version") or _VERSION)
+    config["cn_extension_version"] = version
 
 
 def apply(
