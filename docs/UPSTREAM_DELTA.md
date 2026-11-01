@@ -65,6 +65,16 @@
 | D-0015 | `041b74a` `docs(plan)` | docs | A 股数据层设计文档（含 builder check 裁决）与实施计划 | 无 | 无 | 不涉及代码 |
 | D-0016 | `8a03f73` `fix(data)` | fix | reviewer 修复：指数权重数据源、两融单位、f_ann_date 去重、缓存上限、env 优先级、指数/资金流单位 | 无 | 无 | 全量 1606 passed |
 | D-0017 | 本条提交 `feat(indicators)` | feat | 通达信口径 13 指标（可切 stockstats）+ `cn_indicator_flavor` + 价格头写明复权锚点 | 无 | 无 | 全量 1619 passed；integration 9 passed |
+| D-0018 | `5504440` `docs(research)` | docs | TradingAgents-CN 与上游的对照报告（5 条可借鉴 / 5 条不照搬） | 无 | 无 | 不涉及代码 |
+| D-0019 | `67e64b0` `docs(agent)` | docs | `docs/AGENT_MAP.md`：12 个 agent 的输入/工具/A 股可达性 + B1–B4 批次 | 无 | 无 | 不涉及代码 |
+| D-0020 | `f30a936` `docs(research)` | docs | 外部评审简报（补丁 vs 上游同步） | 无 | 无 | 不涉及代码 |
+| D-0021 | `5009543` `docs(web)` | docs | `docs/WEB_PLAN.md`：局域网单用户、单 worker、服务端渲染 | 无 | 无 | 不涉及代码 |
+| D-0022 | `5953058` `upstream-patch(snapshot)` | **上游补丁** | 快照工具改走 `route_to_vendor`：`agents/tools.py` -1/+3、`dataflows/router.py` +6 | `tradingagents/agents/tools.py`、`tradingagents/dataflows/router.py` | 中低：上游重写工具/router 表时需重放 ~9 行 | `test_snapshot_routing.py` + 上游全量 |
+| D-0023 | `bc455bb` `feat(snapshot)` | feat | 注册 Tushare 版快照实现（签名对齐 4 个位置参数） | 无 | 无 | 同上 |
+| D-0024 | `217b48c` `test(guard)` | test | Sync Guard 拆分 A/B/C + `cn_extension_version` 进入配置与 checkpoint 身份 | 无 | 无 | 38 passed |
+| D-0025 | `64e537a` `feat(report)` | feat | 9 项运行元数据写入 md/json/html | 无 | 无 | 3 passed |
+| D-0026 | `e1ee43d` `chore(sync)` | chore | 同步治理 v2 + `scripts/sync_upstream.sh` + `docs/UPSTREAM_BASE.md` | 无 | 无 | 脚本语法检查 |
+| D-0027 | 本条提交 `upstream-patch(test)` | **上游补丁** | 端到端测试的『实际数据路径』断言跟随快照路由（2 行） | `tests/test_graph_end_to_end.py` | 低：一处集合字面量 | 上游全量 1654 passed |
 
 十余条下游提交合计新增代码与文档，**0 行上游改动**。下游与上游的唯一耦合是文档里登记的"脆弱耦合"，
 现在由 `tests/downstream/test_sync_guard.py`（12 组断言）机械锁定。
