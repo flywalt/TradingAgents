@@ -60,7 +60,9 @@
 | D-0010 | `d83adc2` `feat(statements)` | feat | CAS 三表（合并报表、防前视、亿元、YTD 标注） | 无 | 无 | 9 passed |
 | D-0011 | `1857fdf` `feat(data)` | feat | 资金面/指数/身份/快照接口 + `register_category()` | 无 | 无 | 10 passed |
 | D-0012 | `43dc4a6` `feat(config)` | feat | `cn_strict_ashare` 单 vendor 链 + 三类 vendor 链扩展 | 无 | 无 | 全量 1599 passed |
-| D-0013 | 本条提交 `test(data)` | test/docs | 9 个真实接口冒烟 + `docs/ASHARE_DATA.md` | 无 | 无 | `-m integration` → 9 passed |
+| D-0013 | `51487e9` `test(data)` | test/docs | 9 个真实接口冒烟 + `docs/ASHARE_DATA.md` | 无 | 无 | `-m integration` → 9 passed |
+| D-0014 | `917d1d4` `chore(env)` | chore | uv 管理环境 + `requirements-downstream.txt` + `requirements-lock.txt` + `docs/DEV_ENV.md` | 无 | 无 | `uv run pytest -q` → 1599 passed；integration 9 passed |
+| D-0015 | 本条提交 `docs(plan)` | docs | A 股数据层设计文档（含 builder check 裁决）与实施计划 | 无 | 无 | 不涉及代码 |
 
 十余条下游提交合计新增代码与文档，**0 行上游改动**。下游与上游的唯一耦合是文档里登记的"脆弱耦合"，
 现在由 `tests/downstream/test_sync_guard.py`（12 组断言）机械锁定。
