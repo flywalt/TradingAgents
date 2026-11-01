@@ -87,6 +87,7 @@
 | D-0037 | 本条提交 `test(b3)` | test | Prompt 契约评测：记录型脚本模型捕获 12 节点 prompt，验证身份/规则/口径注入与美股隔离 | 无 | 无 | 新增 4 项，全量 1701 passed |
 | D-0038 | 本条提交 `docs(audit)` | docs | `EXTENSIONS.md` 可审计清单 + `scripts/extension_inventory.py --check`（模块/测试/配置键/补丁缺失即失败） | 无 | 无 | 清单检查通过 |
 | D-0039 | 本条提交 `test(b3)` | test | 黄金场景（工具真调用）：无数据哨兵不被补全、亏损带符号、涨停带板块幅度 | 无 | 无 | 新增 3 项，全量 1707 passed |
+| D-0040 | 本条提交 `feat(macro)` | feat | 中国宏观接口（7 个序列，别名/单位/频率/点时窗）；CN profile `macro_data: tushare,fred`；LPR/10Y 显式拒绝 | 无 | 无 | 新增 8 项离线 + 1 live |
 
 十余条下游提交合计新增代码与文档，**0 行上游改动**。下游与上游的唯一耦合是文档里登记的"脆弱耦合"，
 现在由 `tests/downstream/test_sync_guard.py`（12 组断言）机械锁定。

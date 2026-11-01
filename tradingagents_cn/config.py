@@ -242,10 +242,11 @@ def apply(
         if not isinstance(vendors, dict):
             vendors = merged["data_vendors"] = {}
         explicit_vendors = explicit.get("data_vendors") or {}
-        chain = vendor_chain(strict=bool(merged.get("cn_strict_ashare")))
-        for category, chain_value in chain.items():
-            if category not in explicit_vendors:
-                vendors[category] = chain_value
+        strict = bool(merged.get("cn_strict_ashare"))
+        for category, chain in chosen.vendors.items():
+            if category in explicit_vendors:
+                continue
+            vendors[category] = chain.split(",")[0] if strict else chain
     if not merged.get("cn_strict_ashare"):
         # Profile defaults only; strict mode below sets every managed tool itself.
         for method, chain_value in chosen.tool_vendors.items():

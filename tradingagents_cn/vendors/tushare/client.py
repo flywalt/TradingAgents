@@ -87,6 +87,30 @@ class TushareApi:
         """Valuation and trading snapshot for a session (PE/PB/PS/市值/换手)."""
         return self._call("daily_basic", **kwargs)
 
+    def cn_cpi(self, **kwargs):
+        """China CPI (monthly)."""
+        return self._call("cn_cpi", **kwargs)
+
+    def cn_ppi(self, **kwargs):
+        """China PPI (monthly)."""
+        return self._call("cn_ppi", **kwargs)
+
+    def cn_gdp(self, **kwargs):
+        """China GDP (quarterly)."""
+        return self._call("cn_gdp", **kwargs)
+
+    def cn_m(self, **kwargs):
+        """China money supply M0/M1/M2 (monthly)."""
+        return self._call("cn_m", **kwargs)
+
+    def sf_month(self, **kwargs):
+        """China total social financing (monthly)."""
+        return self._call("sf_month", **kwargs)
+
+    def cn_pmi(self, **kwargs):
+        """China manufacturing PMI (monthly)."""
+        return self._call("cn_pmi", **kwargs)
+
     def stk_holdertrade(self, **kwargs):
         """Insider / major-holder trades with their announcement date."""
         return self._call("stk_holdertrade", **kwargs)

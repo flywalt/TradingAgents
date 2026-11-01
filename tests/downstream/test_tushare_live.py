@@ -185,3 +185,16 @@ def test_live_insider_transactions_answer():
     assert text.startswith(f"# Insider transactions for {SYMBOL}")
     rows = [line for line in text.splitlines() if line and not line.startswith("#")]
     assert len(rows) > 1
+
+
+def test_live_china_macro_series_answer():
+    _skip_without_prerequisites()
+    from tradingagents_cn.vendors.tushare import client
+    from tradingagents_cn.vendors.tushare.macro import get_macro_indicators
+
+    client.reset_api()
+    text = get_macro_indicators("cpi", date.today().isoformat())
+
+    assert "CPI 同比" in text
+    rows = [line for line in text.splitlines() if line and not line.startswith("#")]
+    assert len(rows) > 1

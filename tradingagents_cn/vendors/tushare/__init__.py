@@ -22,6 +22,7 @@ from .flows import (
 from .fundamentals import get_fundamentals
 from .indicators import SUPPORTED_INDICATORS, get_stock_stats_indicators_window
 from .insider import get_insider_transactions
+from .macro import get_macro_indicators
 from .statements import get_balance_sheet, get_cashflow, get_income_statement
 from .stock import get_stock_data
 
@@ -36,6 +37,7 @@ PROVIDERS = {
     "get_cashflow": get_cashflow,
     "get_income_statement": get_income_statement,
     "get_insider_transactions": get_insider_transactions,
+    "get_macro_indicators": get_macro_indicators,
     "get_money_flow": get_money_flow,
     "get_northbound_holdings": get_northbound_holdings,
     "get_margin_detail": get_margin_detail,
@@ -72,6 +74,7 @@ __all__ = [
     "get_cashflow",
     "get_fundamentals",
     "get_insider_transactions",
+    "get_macro_indicators",
     "get_income_statement",
     "get_stock_data",
     "get_stock_stats_indicators_window",
