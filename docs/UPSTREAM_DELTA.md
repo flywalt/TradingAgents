@@ -82,6 +82,8 @@
 | D-0032 | 本条提交 `feat(context)` | feat | 交易约束（涨跌停/T+1/整手，ST 不假设）注入 `instrument_context`；新增 `reference_price()` | 无 | 无 | 图接线 12 项 + 规则 14 项 |
 | D-0033 | 本条提交 `docs(data)` | docs | `DATA_REQUIREMENTS.md`（news 只要标题+摘要+链接+时间；宏观/情绪/预测市场的替代验收标准） | 无 | 无 | 不涉及代码 |
 | D-0034 | 本条提交 `docs(b3)` | docs | `B3_PROMPT_PLAN.md`：评测骨架先行 + TradingAgents-CN prompt 改动核对结论 | 无 | 无 | 不涉及代码 |
+| D-0035 | 本条提交 `feat(markets)` | feat | `market.py`：`MarketProfile` + `UPSTREAM_DEFAULT`/`CN_A_SHARE` + 按交易所识别；`apply(profile=)` 与 `build_graph(market=,symbol=)` 分流；A 股规则仅在 CN profile 注入 | 无 | 无 | 新增 12 项多市场测试，全量 1697 passed |
+| D-0036 | 本条提交 `docs(markets)` | docs | `MARKET_PROFILES.md`（设计/隔离/目录/10 项测试对照）+ 架构文档 v2.2 多市场节 | 无 | 无 | 不涉及代码 |
 
 十余条下游提交合计新增代码与文档，**0 行上游改动**。下游与上游的唯一耦合是文档里登记的"脆弱耦合"，
 现在由 `tests/downstream/test_sync_guard.py`（12 组断言）机械锁定。

@@ -21,6 +21,7 @@
 | `docs/UPSTREAM_CONTRIBUTION_PLAN.md` | 上游贡献备选计划（非近期重点，含触发条件） |
 | `docs/DATA_REQUIREMENTS.md` | 各数据接口的上游需求规格与替代验收标准（新闻/宏观/情绪） |
 | `docs/B3_PROMPT_PLAN.md` | Prompt 专题：先评测后改、CN 项目参照结论 |
+| `docs/MARKET_PROFILES.md` | **多市场 Profile**：UPSTREAM_DEFAULT / CN_A_SHARE、识别规则、隔离、测试计划 |
 
 ---
 
@@ -113,6 +114,9 @@ python -c "from tradingagents_cn.graph.factory import build_graph; ..."
   它们直接构造 `TradingAgentsGraph`，绕过注册与 A 股身份。
 - `tests/downstream/test_entrypoints.py` 用 AST 扫描禁止下游新增直连上游 Graph 的代码。
 - 注册（`bootstrap()`）与运行配置（`build_graph(config)`）是两件事：前者进程级一次，后者每图一份。
+- **市场按交易所/证券标识判定**（`.SS/.SZ/.BJ`、6 位代码 → CN；`.HK`、无后缀美股 → UPSTREAM_DEFAULT）。
+  不得按发行人国籍/名称/语言判定；歧义时（如 4~5 位纯数字）必须报错或显式传 `--market`。
+- A 股规则（T+1/涨跌停/整手/ST）**只在 CN_A_SHARE profile 注入**；`cn_strict_ashare` 在海外 profile 会直接报错。
 
 ## 6. 测试与验证
 

@@ -42,6 +42,13 @@ build_graph(config)    # 运行级：规范化本次配置 → ensure_bootstrapp
 | 无运行上下文直接调用数据工具 | ❌ 不作为生产路径（会用进程级默认配置） |
 | 用 `set_config()` 切换任务间 vendor | ❌ 禁止 |
 
+## 3.1 多市场 Profile（v2.2）
+
+一个代码库，多套市场行为：`UPSTREAM_DEFAULT`（上游原样）与 `CN_A_SHARE`（A 股扩展）。
+Profile 决定 graph 类、身份解析、vendor 默认、严格策略、指标口径、交易规则注入、币种与目录。
+识别**只看交易所与证券标识**：`0700.HK` 是港股，`BABA` 是美股，均不走 A 股规则；歧义输入直接报错。
+详见 `docs/MARKET_PROFILES.md`。
+
 ## 4. 入口：任何研究入口都不得绕过 Factory
 
 | 入口 | 实现 | 保障 |
