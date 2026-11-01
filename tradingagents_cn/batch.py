@@ -12,7 +12,6 @@ from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
-from tradingagents_cn import config as cn_config
 from tradingagents_cn.graph import factory as graph_factory
 
 

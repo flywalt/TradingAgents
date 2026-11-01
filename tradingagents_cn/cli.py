@@ -16,7 +16,6 @@ import sys
 from collections.abc import Sequence
 from pathlib import Path
 
-from tradingagents_cn import config as cn_config
 from tradingagents_cn.graph import factory as graph_factory
 
 DEFAULT_ANALYSTS = "market,social,news,fundamentals"

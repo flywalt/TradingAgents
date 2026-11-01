@@ -13,7 +13,7 @@ from pathlib import Path
 
 import pytest
 
-from tradingagents_cn import cli, config as cn_config
+from tradingagents_cn import cli
 from tradingagents_cn.batch import run_batch
 from tradingagents_cn.graph import factory as graph_factory
 
