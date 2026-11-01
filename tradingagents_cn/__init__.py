@@ -12,12 +12,25 @@ and pinned by ``tests/downstream/test_sync_guard.py``.
 
 __version__ = "0.1.0.dev0"
 
-from .register import RegistrationReport, activate, register_vendor, registered_vendors
+from .bootstrap import (
+    RegistrationReport,
+    activate,
+    bootstrap,
+    ensure_bootstrapped,
+    is_bootstrapped,
+    register_category,
+    register_vendor,
+    registered_vendors,
+)
 
 __all__ = [
     "RegistrationReport",
     "__version__",
     "activate",
+    "bootstrap",
+    "ensure_bootstrapped",
+    "is_bootstrapped",
+    "register_category",
     "register_vendor",
     "registered_vendors",
 ]

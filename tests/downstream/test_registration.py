@@ -82,7 +82,7 @@ def test_invalid_registrations_are_rejected(fake_impl):
         cn_register.register_vendor("get_stock_data", "cn_probe", "not callable")
 
 
-def test_a_new_implementation_replaces_the_previous_one():
+def test_a_conflicting_registration_is_refused_unless_replacement_is_explicit():
     def first(*args, **kwargs):
         return "first"
 
@@ -91,7 +91,12 @@ def test_a_new_implementation_replaces_the_previous_one():
 
     router = _router()
     assert cn_register.register_vendor("get_stock_data", "cn_probe", first)
-    assert cn_register.register_vendor("get_stock_data", "cn_probe", second)
+
+    with pytest.raises(ValueError, match="already registered"):
+        cn_register.register_vendor("get_stock_data", "cn_probe", second)
+    assert router.VENDOR_METHODS["get_stock_data"]["cn_probe"] is first
+
+    assert cn_register.register_vendor("get_stock_data", "cn_probe", second, replace=True)
     assert router.VENDOR_METHODS["get_stock_data"]["cn_probe"] is second
 
 

@@ -8,7 +8,7 @@ it installed; a call without the SDK or without ``TUSHARE_TOKEN`` raises
 
 from __future__ import annotations
 
-from tradingagents_cn.register import register_category, register_vendor
+from tradingagents_cn.bootstrap import register_category, register_vendor
 
 from .calendar import calendar_from_frame, load_calendar
 from .client import TOKEN_ENV, TushareApi, get_api, reset_api, set_api
@@ -25,7 +25,7 @@ from .stock import get_stock_data
 
 #: The router methods this vendor serves. Only prices for now: fundamentals
 #: (CAS statements) and capital flows follow as separate adapters.
-VENDOR_METHODS = {
+PROVIDERS = {
     "get_stock_data": get_stock_data,
     "get_indicators": get_stock_stats_indicators_window,
     "get_fundamentals": get_fundamentals,
@@ -48,7 +48,7 @@ FLOW_METHODS = frozenset(
 def register_vendors() -> None:
     """Register every Tushare implementation with upstream's router."""
     register_category(CATEGORY, "A-share capital flows (资金面): money flow, northbound, margin, 龙虎榜")
-    for method, impl in VENDOR_METHODS.items():
+    for method, impl in PROVIDERS.items():
         category = CATEGORY if method in FLOW_METHODS else None
         register_vendor(method, "tushare", impl, category=category)
 
@@ -57,7 +57,7 @@ __all__ = [
     "SUPPORTED_INDICATORS",
     "TOKEN_ENV",
     "TushareApi",
-    "VENDOR_METHODS",
+    "PROVIDERS",
     "calendar_from_frame",
     "get_api",
     "get_balance_sheet",
