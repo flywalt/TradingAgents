@@ -90,6 +90,9 @@
 | D-0040 | 本条提交 `feat(macro)` | feat | 中国宏观接口（7 个序列，别名/单位/频率/点时窗）；CN profile `macro_data: tushare,fred`；LPR/10Y 显式拒绝 | 无 | 无 | 新增 8 项离线 + 1 live |
 | D-0041 | 本条提交 `docs(b4)` | docs | 上游交互契约（交互问答/单次运行/输出物/状态）+ Web v1 表单、状态机、API、安全与验收 | 无 | 无 | 不涉及代码 |
 | D-0042 | 本条提交 `docs(b4)` | docs | CN Web 层核对：采纳错误分类/SSE 心跳/合规术语/历史过滤；拒绝 Redis/Mongo/双栈/多 service | 无 | 无 | 不涉及代码 |
+| D-0043 | `7865382` `fix(markets)` | fix | spec 自审发现：symbol/market 必须优先于配置里的 profile；CLI/Batch 不再预合并配置 | 无 | 无 | 1717 passed |
+| D-0044 | `a048c65` `docs(b4)` | docs | 交互 spec 重写（8 项自审结论 + 13 条决策记录） | 无 | 无 | 不涉及代码 |
+| D-0045 | 本条提交 `feat(web)` | feat | Web 外壳 W1：FastAPI + SQLite + 单 worker + SSE + 报告/文件服务 + kviewer 钩子；测试 37 个新增 | 无 | 无 | 全量 1744 passed |
 
 十余条下游提交合计新增代码与文档，**0 行上游改动**。下游与上游的唯一耦合是文档里登记的"脆弱耦合"，
 现在由 `tests/downstream/test_sync_guard.py`（12 组断言）机械锁定。

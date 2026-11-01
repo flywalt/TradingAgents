@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}{{ run.symbol }} {{ run.trade_date }}{% endblock %}
+{% block body %}
+<h1>{{ run.symbol }} <small>{{ run.trade_date }}</small></h1>
+<p class="badge" id="status">{{ run.status }}</p>
+{% if run.rating %}<p class="badge">评级：{{ label }}</p>{% endif %}
+<p class="hint">仅供研究，不构成投资建议。</p>
+{% if run.error_category %}
+  <div class="error"><strong>{{ run.error_category }}</strong>：{{ run.error_message }}</div>
+{% endif %}
+<p><a href="/runs/{{ run.id }}/report">打开报告</a> ·
+   <a href="/runs/{{ run.id }}/files/run_metadata.json">元数据</a></p>
+{% if kviewer %}
+  <p><a href="{{ kviewer }}/#/kline?symbol={{ run.symbol }}&end={{ run.trade_date | replace('-', '') }}">在 kviewer 打开（锚定 {{ run.trade_date }}）</a></p>
+{% endif %}
+<h2>进度</h2>
+<ul id="timeline"></ul>
+{% if run.status in ('queued', 'running') %}
+<p><button id="rerun" hidden>重新运行</button></p>
+{% endif %}
+{% endblock %}
+{% block script %}
+<script>
+const runId = '{{ run.id }}';
+const list = document.getElementById('timeline');
+const status = document.getElementById('status');
+const source = new EventSource(`/api/runs/${runId}/events`);
+source.onmessage = (event) => {
+  const data = JSON.parse(event.data);
+  if (data.kind === 'node.started' || data.kind === 'node.finished' || data.kind === 'report.ready') {
+    const item = document.createElement('li');
+    item.textContent = `${data.kind} ${data.payload.node || data.payload.key || ''}`;
+    list.appendChild(item);
+  }
+  if (data.kind === 'run.finished' || data.kind === 'run.failed') {
+    source.close();
+    location.reload();
+  }
+};
+</script>
+{% endblock %}

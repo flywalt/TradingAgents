@@ -1,0 +1,14 @@
+<!doctype html>
+<html lang="zh">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}TradingAgents{% endblock %}</title>
+  <link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+  <header><a href="/">研究</a><a href="/history">历史</a></header>
+  <main>{% block body %}{% endblock %}</main>
+  <script>{% block script %}{% endblock %}</script>
+</body>
+</html>

@@ -1,6 +1,6 @@
 # WEB_PLAN.md — Web 界面（B4）
 
-> 状态：已定范围，未开工。开工前置：B1（agent 接线）完成，且外部评审对补丁/同步策略的结论回来。
+> 状态：**W1 已实现**（`tradingagents_web/`），W2–W4 未开工。实现契约见 `docs/B4_INTERACTION_SPEC.md`。
 > 定位：**下游外壳**，不是第二套分析引擎；上游 `cli/` 与 `tradingagents/` 一行不改。
 
 ## 1. 已确认的范围（2026-11-01）

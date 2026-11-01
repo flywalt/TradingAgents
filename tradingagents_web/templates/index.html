@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block title %}发起分析{% endblock %}
+{% block body %}
+<h1>发起分析</h1>
+<form id="run-form">
+  <label>标的 <input name="symbol" id="symbol" placeholder="600519.SH" required></label>
+  <p id="preview" class="hint"></p>
+  <label>日期 <input name="date" type="date" required></label>
+  <fieldset>
+    <legend>分析师</legend>
+    {% for a in analysts %}<label class="inline"><input type="checkbox" name="analysts" value="{{ a }}" checked>{{ a }}</label>{% endfor %}
+  </fieldset>
+  <label>语言 <select name="language">{% for l in languages %}<option>{{ l }}</option>{% endfor %}</select></label>
+  <label class="inline"><input type="checkbox" name="strict"> 严格模式（仅 A 股）</label>
+  <details><summary>组合（可选 JSON）</summary>
+    <textarea name="portfolio" rows="4" placeholder='{"cash": 100000, "currency": "CNY", "positions": []}'></textarea>
+  </details>
+  <button type="submit">开始分析</button>
+  <p id="form-error" class="error"></p>
+</form>
+
+<h2>最近</h2>
+<table>
+  <thead><tr><th>时间</th><th>标的</th><th>状态</th><th>评级</th></tr></thead>
+  <tbody>
+  {% for r in runs %}
+    <tr><td>{{ r.created_at }}</td><td><a href="/runs/{{ r.id }}">{{ r.symbol }}</a></td>
+        <td>{{ r.status }}</td><td>{{ r.rating or "" | rating_label }}</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endblock %}
+{% block script %}
+<script>
+const symbol = document.getElementById('symbol');
+symbol.addEventListener('blur', async () => {
+  if (!symbol.value) return;
+  const res = await fetch('/api/preview?symbol=' + encodeURIComponent(symbol.value));
+  const box = document.getElementById('preview');
+  const data = await res.json();
+  box.textContent = res.ok ? `${data.symbol} · ${data.profile}${data.name ? ' · ' + data.name : ''}`
+                           : (data.error ? data.error.message : '无法预览');
+  box.className = res.ok ? 'hint' : 'error';
+});
+document.getElementById('run-form').addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const form = event.target;
+  const payload = {
+    symbol: form.symbol.value,
+    date: form.date.value,
+    analysts: [...form.querySelectorAll('input[name=analysts]:checked')].map(i => i.value),
+    language: form.language.value,
+    strict: form.strict.checked,
+  };
+  if (form.portfolio.value.trim()) {
+    try { payload.portfolio = JSON.parse(form.portfolio.value); }
+    catch (e) { return show('组合 JSON 解析失败'); }
+  }
+  const res = await fetch('/api/runs', {method: 'POST',
+    headers: {'Content-Type': 'application/json', 'X-Requested-With': 'fetch'},
+    body: JSON.stringify(payload)});
+  const data = await res.json();
+  if (!res.ok) return show(data.error ? `${data.error.message} ${data.error.action}` : '提交失败');
+  location.href = '/runs/' + data.id;
+});
+function show(message) { const box = document.getElementById('form-error'); box.textContent = message; }
+</script>
+{% endblock %}

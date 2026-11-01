@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}历史{% endblock %}
+{% block body %}
+<h1>历史（{{ total }}）</h1>
+<form method="get">
+  <input name="symbol" placeholder="600519.SH" value="{{ symbol }}">
+  <select name="status"><option value="">状态</option>
+    {% for s in ['queued','running','succeeded','failed'] %}<option value="{{ s }}" {% if status == s %}selected{% endif %}>{{ s }}</option>{% endfor %}
+  </select>
+  <input name="rating" placeholder="评级" value="{{ rating }}">
+  <button>筛选</button>
+</form>
+<table>
+  <thead><tr><th>时间</th><th>标的</th><th>日期</th><th>状态</th><th>评级</th></tr></thead>
+  <tbody>
+  {% for r in runs %}
+    <tr><td>{{ r.created_at }}</td><td><a href="/runs/{{ r.id }}">{{ r.symbol }}</a></td>
+        <td>{{ r.trade_date }}</td><td>{{ r.status }}</td><td>{{ r.rating or "" | rating_label }}</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+<p>
+  {% if page > 1 %}<a href="?page={{ page - 1 }}&symbol={{ symbol }}&status={{ status }}&rating={{ rating }}">上一页</a>{% endif %}
+  {% if page * 20 < total %}<a href="?page={{ page + 1 }}&symbol={{ symbol }}&status={{ status }}&rating={{ rating }}">下一页</a>{% endif %}
+</p>
+{% endblock %}

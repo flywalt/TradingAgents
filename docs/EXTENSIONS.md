@@ -42,7 +42,21 @@
 | `tradingagents_cn/graph/factory.py` | **唯一**按 Profile 选 graph 类的入口；脏工作区 checkpoint 守卫 |
 | `tradingagents_cn/graph/trading_graph.py` | `CnTradingAgentsGraph`：身份解析 + A 股规则注入 + 元数据 |
 
-### 2.3 数据源
+### 2.3 Web 外壳（`tradingagents_web/`，B4 W1）
+
+| 文件 | 职责 |
+| --- | --- |
+| `tradingagents_web/__init__.py` | 包说明 |
+| `tradingagents_web/__main__.py` | `python -m tradingagents_web`，uvicorn 单 worker |
+| `tradingagents_web/app.py` | FastAPI 路由、鉴权、页面、SSE、报告/文件服务 |
+| `tradingagents_web/db.py` | SQLite schema（runs/events）、WAL、迁移 |
+| `tradingagents_web/jobs.py` | 任务 CRUD、状态迁移、事件序号、崩溃恢复、队位 |
+| `tradingagents_web/worker.py` | 单线程队列（1 运行 + 3 排队） |
+| `tradingagents_web/runner.py` | 任务执行序列、节点回调映射、job.json、失败分类 |
+| `tradingagents_web/errors.py` | 异常 → category/message/action |
+| `tradingagents_web/security.py` | 读写 token、CORS、路径白名单 |
+
+### 2.4 数据源
 
 | 文件 | 职责 |
 | --- | --- |
@@ -79,6 +93,11 @@
 | `tests/downstream/test_prompt_contracts.py` | **捕获真实 prompt**：身份/规则进入、美股无 A 股规则 |
 | `tests/downstream/test_prompt_scenarios.py` | 黄金场景（工具真调用）：无数据哨兵、亏损带符号、涨停带幅度 |
 | `tests/downstream/test_macro.py` | 宏观别名/单位/时间窗/不可用拒绝/路由 |
+| `tests/downstream/test_web_jobs.py` | 队位、崩溃恢复、事件序号 |
+| `tests/downstream/test_web_errors.py` | 错误分类 |
+| `tests/downstream/test_web_security.py` | token 比较、路径白名单 |
+| `tests/downstream/test_web_runner_worker.py` | 执行序列/产物/失败分类/worker 恢复 |
+| `tests/downstream/test_web_api.py` | 鉴权/校验/队列/页面/SSE/文件越权 |
 | `tests/downstream/test_checkpoint_behavior.py` | 版本/口径/脏工作区使 checkpoint 失效 |
 | `tests/downstream/test_run_metadata.py` | 11 项元数据三处渲染 |
 | `tests/downstream/test_snapshot_routing.py` | 快照路由、契约不变、同源一致 |
@@ -146,6 +165,8 @@
 - `python -m tradingagents_cn.cli analyze --ticker 600519.SH --date 2026-10-30 [--strict] [--market CN]`
 - `python -m tradingagents_cn.cli batch --tickers ... --dates ...`
 - 程序化：`tradingagents_cn.graph.factory.build_graph(config, symbol=...)`（Profile 自动分流）
+- Web：`python -m tradingagents_web --host 0.0.0.0 --port 8501`
+  （`TRADINGAGENTS_WEB_TOKEN` 必填；`TRADINGAGENTS_WEB_READ_TOKEN` 只读；`KVIEWER_BASE_URL` 可选）
 
 ## 8. 如何复核（可执行）
 
