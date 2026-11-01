@@ -9,7 +9,8 @@
 | --- | --- | --- | --- |
 | `get_stock_data` | Tushare `daily` / `pro_bar` | ✅ | 股 / 元 |
 | `get_indicators` | Tushare 日线 **本地计算**（默认**通达信口径** 13 个指标，可切 stockstats） | ✅ | 价格单位 |
-| `get_fundamentals` | `stock_basic` + `daily_basic` + `fina_indicator` | ✅ | 亿元 / % |
+| `get_fundamentals` | `stock_basic` + `daily_basic` + `fina_indicator` + `namechange`（历史名称） | ✅ | 亿元 / % |
+| `get_insider_transactions` | `stk_holdertrade`（仅含已公告） | ✅ | 股 / 元 / % |
 | `get_income_statement` | `income`（CAS，合并报表） | ✅ | 亿元，YTD |
 | `get_balance_sheet` | `balancesheet` | ✅ | 亿元，期末 |
 | `get_cashflow` | `cashflow` | ✅ | 亿元，YTD |
@@ -63,6 +64,13 @@
    每个输出的头部写明来源、口径、单位。
 3. **错误分层**：非 A 股 → `NoMarketDataError`（让位给下一家 vendor）；
    无 token/无权限 → `VendorNotConfiguredError`；网络/限流 → `VendorUnavailableError`。
+
+## 4.1 交易约束如何进入 Agent
+
+不改任何 prompt 文件：`CnTradingAgentsGraph.resolve_instrument_context()` 在身份上下文后追加一段确定性约束
+（涨跌停幅度按板块、T+1、整手规则、ST/停牌不可用不假设），12/12 个 agent 都会看到。
+除权参考价由 `trading_rules.reference_price()` 提供（例如 2026-06-26 茅台：1212.10 − 23.957 = 1188.14），
+只在交易可行性判断时使用，尚未接线。
 
 ## 5. 路由与严格模式
 

@@ -80,10 +80,10 @@ START ─┬─ Market Analyst      ─┐
 
 | ID | 内容 | 验收 |
 | --- | --- | --- |
-| B1-1 | 覆写 `TradingAgentsGraph.resolve_instrument_context`，改用 `identity.resolve_identity` + `format_identity` | 12 个 prompt 都含公司名/行业；US 标的回退 Yahoo |
-| B1-2 | 下游 market analyst（自有 TOOLS）：用 `build_market_snapshot` 替换 Yahoo 快照 | 图跑通；Yahoo 快照未被调用；指标/价格/快照同源 |
-| B1-3 | 注册 `get_insider_transactions` → Tushare `stk_holdertrade` | A 股命中 Tushare，美股回落 Yahoo |
-| B1-4 | 把 `trading_rules`（涨跌停/T+1/整手/ST）+ 除权参考价小函数注入 `instrument_context` | prompt 含正确板块幅度；除权日参考价有单测 |
+| B1-1 ✅ | 覆写 `resolve_instrument_context`，Tushare 身份 + `namechange` PIT | 12 个 prompt 含公司名/行业；US 回退 Yahoo（D-0029） |
+| B1-2 ✅ | 快照改走 vendor 路由（`upstream-patch:` + Tushare 实现） | 快照与行情同源、不越界、严格模式不回落（D-0022/23） |
+| B1-3 ✅ | 注册 `get_insider_transactions` → `stk_holdertrade`，按公告日过滤 | A 股命中 Tushare，美股回落 Yahoo（D-0031） |
+| B1-4 ✅ | `trading_rules` 约束注入 `instrument_context` + `reference_price()` | 板块幅度/T+1/整手进上下文；参考价有单测（D-0032） |
 
 ### B2 — 补 A 股数据源（独立专题：新闻与情绪）
 

@@ -78,6 +78,8 @@
 | D-0028 | `211c690` `refactor(core)` | refactor | P0 修订：`bootstrap()` 与运行配置分离、自建 CLI/Batch、严格模式锁 `tool_vendors`、真实并发隔离测试 | 无 | 无 | 1675 passed |
 | D-0029 | `06b7940` `feat(roi)` | feat | P1 修订：`namechange` PIT 名称、快照与行情同源校验、脏工作区禁止 checkpoint、元数据 11 字段 | 无 | 无 | 1675 passed |
 | D-0030 | 本条提交 `docs(extension)` | docs | 扩展架构 v2.1 重写（层级按实际侵入性、兼容性表述、并发矩阵、严格模式、入口规则、L4a 取消行数门槛） | 无 | 无 | 不涉及代码 |
+| D-0031 | 本条提交 `feat(insider)` | feat | `get_insider_transactions` → Tushare `stk_holdertrade`，按公告日过滤；默认 `tool_vendors` 定向到 `tushare,yfinance` | 无 | 无 | 新增 5 项离线 + 1 项 live |
+| D-0032 | 本条提交 `feat(context)` | feat | 交易约束（涨跌停/T+1/整手，ST 不假设）注入 `instrument_context`；新增 `reference_price()` | 无 | 无 | 图接线 12 项 + 规则 14 项 |
 
 十余条下游提交合计新增代码与文档，**0 行上游改动**。下游与上游的唯一耦合是文档里登记的"脆弱耦合"，
 现在由 `tests/downstream/test_sync_guard.py`（12 组断言）机械锁定。
