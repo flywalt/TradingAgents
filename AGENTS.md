@@ -17,6 +17,8 @@
 | `docs/ASHARE_DATA.md` | A 股数据层能力矩阵、价格/指标口径、缓存限流、限制清单 |
 | `docs/AGENT_MAP.md` | Agent 层地图：12 个节点的输入/工具/A 股可达性 + B1/B2/B3 批次计划 |
 | `docs/WEB_PLAN.md` | Web 界面（B4）：局域网单用户、单 worker、服务端渲染、安全边界 |
+| `docs/EXTENSION_ARCHITECTURE.md` | **扩展架构 v2**：L1–L4 手段、关键契约、Checkpoint/版本、补丁登记 |
+| `docs/UPSTREAM_CONTRIBUTION_PLAN.md` | 上游贡献备选计划（非近期重点，含触发条件） |
 
 ---
 
