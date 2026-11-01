@@ -23,6 +23,7 @@
 | `docs/B3_PROMPT_PLAN.md` | Prompt 专题：先评测后改、CN 项目参照结论 |
 | `docs/MARKET_PROFILES.md` | **多市场 Profile**：UPSTREAM_DEFAULT / CN_A_SHARE、识别规则、隔离、测试计划 |
 | `docs/EXTENSIONS.md` | **本地扩展可审计清单**（模块/测试/配置键/补丁，脚本强制同步） |
+| `docs/B4_INTERACTION_SPEC.md` | Web 接入前的上游交互契约（输入/输出/状态机/API 草案） |
 
 ---
 

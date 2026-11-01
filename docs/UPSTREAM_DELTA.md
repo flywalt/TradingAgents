@@ -88,6 +88,7 @@
 | D-0038 | 本条提交 `docs(audit)` | docs | `EXTENSIONS.md` 可审计清单 + `scripts/extension_inventory.py --check`（模块/测试/配置键/补丁缺失即失败） | 无 | 无 | 清单检查通过 |
 | D-0039 | 本条提交 `test(b3)` | test | 黄金场景（工具真调用）：无数据哨兵不被补全、亏损带符号、涨停带板块幅度 | 无 | 无 | 新增 3 项，全量 1707 passed |
 | D-0040 | 本条提交 `feat(macro)` | feat | 中国宏观接口（7 个序列，别名/单位/频率/点时窗）；CN profile `macro_data: tushare,fred`；LPR/10Y 显式拒绝 | 无 | 无 | 新增 8 项离线 + 1 live |
+| D-0041 | 本条提交 `docs(b4)` | docs | 上游交互契约（交互问答/单次运行/输出物/状态）+ Web v1 表单、状态机、API、安全与验收 | 无 | 无 | 不涉及代码 |
 
 十余条下游提交合计新增代码与文档，**0 行上游改动**。下游与上游的唯一耦合是文档里登记的"脆弱耦合"，
 现在由 `tests/downstream/test_sync_guard.py`（12 组断言）机械锁定。
