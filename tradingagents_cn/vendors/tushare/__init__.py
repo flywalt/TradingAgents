@@ -12,6 +12,7 @@ from tradingagents_cn.register import register_vendor
 
 from .calendar import calendar_from_frame, load_calendar
 from .client import TOKEN_ENV, TushareApi, get_api, reset_api, set_api
+from .fundamentals import get_fundamentals
 from .indicators import SUPPORTED_INDICATORS, get_stock_stats_indicators_window
 from .stock import get_stock_data
 
@@ -20,6 +21,7 @@ from .stock import get_stock_data
 VENDOR_METHODS = {
     "get_stock_data": get_stock_data,
     "get_indicators": get_stock_stats_indicators_window,
+    "get_fundamentals": get_fundamentals,
 }
 
 
@@ -36,6 +38,7 @@ __all__ = [
     "VENDOR_METHODS",
     "calendar_from_frame",
     "get_api",
+    "get_fundamentals",
     "get_stock_data",
     "get_stock_stats_indicators_window",
     "load_calendar",

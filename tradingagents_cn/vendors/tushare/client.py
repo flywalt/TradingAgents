@@ -73,8 +73,60 @@ class TushareApi:
 
     def trade_cal(self, **kwargs):
         """The exchange calendar (``pro.trade_cal``)."""
+        return self._call("trade_cal", **kwargs)
+
+    def stock_basic(self, **kwargs):
+        """Company profile: name, industry, area, board, listing date."""
+        return self._call("stock_basic", **kwargs)
+
+    def daily_basic(self, **kwargs):
+        """Valuation and trading snapshot for a session (PE/PB/PS/市值/换手)."""
+        return self._call("daily_basic", **kwargs)
+
+    def fina_indicator(self, **kwargs):
+        """Financial-indicator summary per report period (EPS, ROE, margins)."""
+        return self._call("fina_indicator", **kwargs)
+
+    def income(self, **kwargs):
+        """Income statement (CAS, 利润表)."""
+        return self._call("income", **kwargs)
+
+    def balancesheet(self, **kwargs):
+        """Balance sheet (CAS, 资产负债表)."""
+        return self._call("balancesheet", **kwargs)
+
+    def cashflow(self, **kwargs):
+        """Cash-flow statement (CAS, 现金流量表)."""
+        return self._call("cashflow", **kwargs)
+
+    def moneyflow(self, **kwargs):
+        """Per-stock order-flow breakdown."""
+        return self._call("moneyflow", **kwargs)
+
+    def hk_hold(self, **kwargs):
+        """Northbound (Stock Connect) holdings; per-stock disclosure ended 2024-08-16."""
+        return self._call("hk_hold", **kwargs)
+
+    def margin_detail(self, **kwargs):
+        """Margin-financing and short-selling balances."""
+        return self._call("margin_detail", **kwargs)
+
+    def top_list(self, **kwargs):
+        """Dragon-Tiger list (龙虎榜) for a trade date."""
+        return self._call("top_list", **kwargs)
+
+    def index_daily(self, **kwargs):
+        """Index daily bars."""
+        return self._call("index_daily", **kwargs)
+
+    def index_member_all(self, **kwargs):
+        """Index membership (industry classification)."""
+        return self._call("index_member_all", **kwargs)
+
+    def _call(self, endpoint: str, **kwargs):
+        """Throttled call to a ``pro`` endpoint, by name."""
         throttle()
-        return self._pro.trade_cal(**kwargs)
+        return getattr(self._pro, endpoint)(**kwargs)
 
 
 def _build_api() -> TushareApi:
