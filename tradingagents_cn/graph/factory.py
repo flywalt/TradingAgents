@@ -9,8 +9,10 @@ removes.
 
 from __future__ import annotations
 
+from tradingagents_cn import config as cn_config
 from tradingagents_cn.bootstrap import RegistrationReport, bootstrap
 from tradingagents_cn.graph.trading_graph import CnTradingAgentsGraph
+from tradingagents_cn.runmeta import worktree_dirty
 
 DEFAULT_ANALYSTS = ("market", "social", "news", "fundamentals")
 
@@ -22,19 +24,32 @@ def build_graph(
     debug: bool = False,
     callbacks: list | None = None,
 ) -> CnTradingAgentsGraph:
-    """Register the downstream vendors, then build the graph with the merged config."""
-    report = bootstrap(config)
+    """Normalize this run's config, ensure registration, build the graph.
+
+    Registration is process-wide (``bootstrap``); configuration is per graph.
+    The normalized dict is a fresh copy, so two graphs never share state.
+    """
+    bootstrap()
+    settings = cn_config.apply(config)
+    if settings.get("checkpoint_enabled") and worktree_dirty() and not settings.get(
+        "cn_allow_dirty_checkpoint"
+    ):
+        raise RuntimeError(
+            "checkpoint_enabled with an uncommitted worktree: a resume would run "
+            "different code under the same version. Commit, or set "
+            "cn_allow_dirty_checkpoint=True for a development run."
+        )
     return CnTradingAgentsGraph(
         selected_analysts=selected_analysts,
         debug=debug,
-        config=report.config,
+        config=settings,
         callbacks=callbacks,
     )
 
 
-def build_report(config: dict | None = None) -> RegistrationReport:
-    """Register without building a graph (health checks, metadata, tests)."""
-    return bootstrap(config)
+def build_report() -> RegistrationReport:
+    """Register without building a graph (health checks, tests)."""
+    return bootstrap()
 
 
 __all__ = ["DEFAULT_ANALYSTS", "build_graph", "build_report"]

@@ -164,5 +164,5 @@ def test_a_graph_cannot_be_built_before_registration(tmp_path, monkeypatch):
     with pytest.raises(RuntimeError, match="bootstrap"):
         CnTradingAgentsGraph(config=cfg)
 
-    bootstrap(cfg)
+    bootstrap()
     CnTradingAgentsGraph(config=cfg)     # no raise once registered

@@ -40,11 +40,14 @@ _BOOTSTRAPPED = False
 
 
 class RegistrationReport:
-    """What ``bootstrap()`` installed, and the config to hand to the graph."""
+    """What ``bootstrap()`` installed. It carries no run configuration.
 
-    def __init__(self, config: dict, vendors: tuple[tuple[str, str], ...],
-                 already_active: bool):
-        self.config = config
+    Registration is process-wide and happens once; the configuration for a run
+    belongs to that graph. Mixing the two here was the v2 defect this class no
+    longer allows.
+    """
+
+    def __init__(self, vendors: tuple[tuple[str, str], ...], already_active: bool):
         self.vendors = vendors
         self.already_active = already_active
 
@@ -226,23 +229,22 @@ def _install_builtins() -> None:
             registrar()
 
 
-def bootstrap(config: dict | None = None, *, install_vendor_chain: bool = True) -> RegistrationReport:
-    """Register the downstream vendors and return the config for the graph.
+def bootstrap() -> RegistrationReport:
+    """Register the downstream vendors. No configuration is read or written.
 
-    Idempotent. The returned config is a new dict; upstream's ``DEFAULT_CONFIG``
-    is never mutated.
+    Idempotent and process-wide. ``build_graph(config)`` is the one place a run's
+    configuration is produced and bound; calling it without bootstrapping fails
+    in ``ensure_bootstrapped``.
     """
     global _BOOTSTRAPPED
-    from tradingagents_cn import config as cn_config
-
     previously = _BOOTSTRAPPED
     _install_builtins()
-    merged = cn_config.apply(config, install_vendor_chain=install_vendor_chain)
     _BOOTSTRAPPED = True
-    return RegistrationReport(merged, registered_vendors(), previously)
+    return RegistrationReport(registered_vendors(), previously)
 
 
 #: Backwards-compatible alias: older downstream code and docs say ``activate()``.
+#: It no longer accepts a config — registration and configuration are separate.
 activate = bootstrap
 
 

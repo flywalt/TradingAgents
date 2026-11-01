@@ -7,7 +7,6 @@ would be invisible to every other test in the suite.
 
 from __future__ import annotations
 
-import copy
 import subprocess
 import sys
 from pathlib import Path
@@ -117,31 +116,3 @@ def test_reset_restores_the_upstream_router(fake_impl):
     } == tools_before
     assert cn_register.registered_vendors() == ()
     assert cn_register.is_active() is False
-
-
-def test_activate_returns_a_full_config_and_leaves_upstream_defaults_alone():
-    from tradingagents.default_config import DEFAULT_CONFIG
-
-    before = copy.deepcopy(DEFAULT_CONFIG)
-
-    report = cn_register.activate()
-    assert report.already_active is False
-    assert report.config["cn_market"] == "ashare"
-    assert report.config["cn_adjust"] == "qfq"
-    # Upstream keys are present, so the config can go straight into the graph.
-    for key in ("results_dir", "llm_provider", "data_vendors", "max_debate_rounds"):
-        assert key in report.config, key
-    assert report.config["data_vendors"]["core_stock_apis"] == "tushare,yfinance"
-
-    assert before == DEFAULT_CONFIG, "activate() must not mutate DEFAULT_CONFIG"
-    assert cn_register.is_active() is True
-
-    second = cn_register.activate()
-    assert second.already_active is True
-
-
-def test_activate_lets_an_explicit_vendor_choice_win():
-    report = cn_register.activate({"data_vendors": {"core_stock_apis": "yfinance"}})
-    assert report.config["data_vendors"]["core_stock_apis"] == "yfinance"
-    # Untouched categories keep their chain.
-    assert report.config["data_vendors"]["news_data"] == "yfinance"

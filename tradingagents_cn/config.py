@@ -23,6 +23,11 @@ import os
 from copy import deepcopy
 
 from tradingagents_cn._version import VERSION as _VERSION
+from tradingagents_cn.runmeta import (
+    DATA_SCHEMA_VERSION,
+    FINANCIAL_FORMULA_VERSION,
+    MARKET_RULES_VERSION,
+)
 
 #: Keys this layer owns. The ``cn_`` prefix keeps them apart from upstream's.
 DEFAULT_CN_CONFIG: dict = {
@@ -44,6 +49,14 @@ DEFAULT_CN_CONFIG: dict = {
     #: extension upgrade invalidates stale checkpoints instead of resuming a run
     #: whose node behaviour changed underneath it.
     "cn_extension_version": _VERSION,
+    #: Formula / rule / schema versions. They are run config on purpose: upstream
+    #: hashes the config into the checkpoint thread id, so changing a formula
+    #: invalidates stale checkpoints instead of resuming under new maths.
+    "cn_formula_version": FINANCIAL_FORMULA_VERSION,
+    "cn_rules_version": MARKET_RULES_VERSION,
+    "cn_data_schema_version": DATA_SCHEMA_VERSION,
+    #: Development escape hatch: allow resumable checkpoints from a dirty tree.
+    "cn_allow_dirty_checkpoint": False,
     #: Strict A-share mode: chains become Tushare-only, so a Tushare outage is
     #: reported as unavailable instead of silently served from Yahoo (a
     #: different price basis). Off by default so US tickers keep working.
@@ -69,6 +82,19 @@ _ENV_OVERRIDES = {
 
 _TRUE = ("true", "1", "yes", "on")
 _FALSE = ("false", "0", "no", "off")
+
+#: Methods whose data must come from Tushare when strict mode is on. Kept
+#: explicit: "all methods" would silently include news/macro, which A-share
+#: vendors do not serve yet.
+MANAGED_METHODS = (
+    "get_stock_data",
+    "get_indicators",
+    "get_verified_market_snapshot",
+    "get_fundamentals",
+    "get_balance_sheet",
+    "get_cashflow",
+    "get_income_statement",
+)
 
 ADJUSTMENTS = ("qfq", "hfq", "none")
 INDICATOR_FLAVORS = ("tdx", "stockstats")
@@ -209,7 +235,37 @@ def apply(
         for category, chain_value in chain.items():
             if category not in chosen:
                 vendors[category] = chain_value
+
+    if merged.get("cn_strict_ashare"):
+        _enforce_strict_tool_vendors(merged)
     return merged
+
+
+def _enforce_strict_tool_vendors(config: dict) -> None:
+    """Lock every managed tool to Tushare, refusing contradictory configuration.
+
+    ``tool_vendors`` beats ``data_vendors`` in upstream's ``get_vendor``, so
+    setting only the categories would let a single stale per-tool override route
+    a run back to Yahoo — silently, and with a different price basis. Strict
+    mode therefore fails at startup instead of degrading.
+    """
+    tool_vendors = config.get("tool_vendors")
+    if not isinstance(tool_vendors, dict):
+        tool_vendors = config["tool_vendors"] = {}
+
+    conflicts = [
+        (method, tool_vendors[method])
+        for method in MANAGED_METHODS
+        if str(tool_vendors.get(method, "tushare")).strip().lower() not in ("tushare", "")
+    ]
+    if conflicts:
+        listed = ", ".join(f"{method}={vendor}" for method, vendor in conflicts)
+        raise ValueError(
+            "cn_strict_ashare requires Tushare for managed tools; "
+            f"these tool_vendors contradict it: {listed}"
+        )
+    for method in MANAGED_METHODS:
+        tool_vendors[method] = "tushare"
 
 
 def _overlay(base: dict, overlay: dict) -> dict:

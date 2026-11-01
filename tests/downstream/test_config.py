@@ -150,3 +150,58 @@ def test_the_indicator_flavour_defaults_to_tongdaxin():
 def test_an_unknown_indicator_flavour_fails_at_startup():
     with pytest.raises(ValueError, match="cn_indicator_flavor"):
         cn_config.apply({"cn_indicator_flavor": "talib"})
+
+
+# --- registration is not configuration -------------------------------------
+
+
+def test_apply_returns_a_full_config_and_leaves_upstream_defaults_alone():
+    from tradingagents.default_config import DEFAULT_CONFIG
+
+    before = copy.deepcopy(DEFAULT_CONFIG)
+    merged = cn_config.apply()
+
+    assert merged["cn_market"] == "ashare"
+    for key in ("results_dir", "llm_provider", "data_vendors", "max_debate_rounds"):
+        assert key in merged, key
+    assert merged["data_vendors"]["core_stock_apis"] == "tushare,yfinance"
+    assert before == DEFAULT_CONFIG, "apply() must not mutate DEFAULT_CONFIG"
+
+
+def test_an_explicit_vendor_choice_wins_in_normal_mode():
+    merged = cn_config.apply({"data_vendors": {"core_stock_apis": "yfinance"}})
+
+    assert merged["data_vendors"]["core_stock_apis"] == "yfinance"
+    assert merged["data_vendors"]["news_data"] == "yfinance"
+
+
+# --- strict mode must win over per-tool overrides --------------------------
+
+
+def test_strict_mode_sets_the_tool_level_vendors_too():
+    merged = cn_config.apply({"cn_strict_ashare": True})
+
+    for method in cn_config.MANAGED_METHODS:
+        assert merged["tool_vendors"][method] == "tushare", method
+
+
+def test_strict_mode_refuses_a_contradictory_tool_override():
+    with pytest.raises(ValueError, match="get_stock_data=yfinance"):
+        cn_config.apply({
+            "cn_strict_ashare": True,
+            "tool_vendors": {"get_stock_data": "yfinance"},
+        })
+
+
+def test_normal_mode_still_honours_a_tool_override():
+    merged = cn_config.apply({"tool_vendors": {"get_stock_data": "yfinance"}})
+
+    assert merged["tool_vendors"]["get_stock_data"] == "yfinance"
+
+
+def test_the_version_keys_are_part_of_the_run_config():
+    merged = cn_config.apply()
+
+    assert merged["cn_formula_version"]
+    assert merged["cn_rules_version"]
+    assert merged["cn_data_schema_version"]

@@ -126,8 +126,9 @@ def test_strict_mode_never_falls_through_to_a_different_basis():
     assert reached == []
 
 
-def test_the_public_entry_points_keep_their_signatures():
-    assert list(inspect.signature(boot).parameters)[0] == "config"
+def test_bootstrap_takes_no_configuration():
+    """Registration is process-wide; a run's config belongs to its graph."""
+    assert list(inspect.signature(boot).parameters) == []
     parameters = inspect.signature(register_vendor).parameters
     assert list(parameters)[:3] == ["method", "vendor", "impl"]
     assert parameters["replace"].default is False
