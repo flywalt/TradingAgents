@@ -209,3 +209,32 @@ def test_the_typography_scale_is_declared_for_chinese():
     assert "1.13rem" in style                            # h4 >= body
     assert "1.06rem" in style                            # h5 == body, heavier
     assert ".ta-summary h2" in style and "1.13rem" in style
+
+
+def test_digits_and_han_come_from_one_typeface():
+    """Charter first mixed DejaVu digits with Noto Han; one family leads now."""
+    out = report_page.present(SAMPLE, "中文")
+
+    style = out[out.index('<style id="ta-cn">'):out.index("</style>")]
+    serif_decl = style[style.index("--serif:"):style.index("serif;", style.index("--serif:"))]
+    assert serif_decl.index("Noto Serif CJK SC") < serif_decl.index("Charter")
+    assert "tabular-nums" in style
+
+
+def test_the_company_name_leads_where_there_is_room():
+    out = report_page.present(SAMPLE, "中文", name="贵州茅台")
+
+    assert '<span class="ticker">贵州茅台 · 600519.SH</span>' in out
+    assert "<title>贵州茅台 600519.SH" in out
+
+
+def test_a_report_without_a_name_keeps_the_plain_ticker():
+    out = report_page.present(SAMPLE, "中文")
+
+    assert '<span class="ticker">600519.SH</span>' in out
+
+
+def test_the_name_leads_even_in_an_english_report():
+    out = report_page.present(SAMPLE, "English", name="Kweichow Moutai")
+
+    assert '<span class="ticker">Kweichow Moutai · 600519.SH</span>' in out
