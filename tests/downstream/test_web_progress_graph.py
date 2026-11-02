@@ -166,8 +166,6 @@ def test_a_debate_stage_hands_over_as_one_voice(width):
     """The manager reads the whole exchange, so the group speaks - in both
     layouts, and never one debater's own line."""
     layout = progress_graph.topology(ALL)[width]
-    boxes = _boxes(layout)
-    portfolio = boxes["portfolio"]
 
     into_manager = [e for e in layout["edges"] if e["to"] == "research-manager"]
     assert [(e["from"], e["kind"]) for e in into_manager] == [("research", "flow")]
