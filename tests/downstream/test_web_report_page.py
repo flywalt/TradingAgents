@@ -24,6 +24,10 @@ SAMPLE = """<!doctype html>
 <span class="label">Analyst Team Reports</span></a></li></ul></nav>
 <main><section id="s1"><h2>I. Analyst Team Reports</h2><h3>Market Analyst</h3>
 <p>正文中的 Generated、Analysts 这些词不该被翻译。</p></section>
+<section id="s5"><h2>V. Portfolio Manager Decision</h2><h3 id="s5-1">Portfolio Manager</h3>
+<p>维持当前配置，重点放在确定性更高的品种上。</p>
+<p>组合在本周没有需要立即执行的调整；风险预算保持不变。</p>
+<p>第三段不应出现在摘要里。</p></section>
 <section id="s6"><h2>Downstream run metadata</h2></section></main>
 <a class="to-top" href="#top">Top</a>
 </body>
@@ -85,7 +89,9 @@ def _upstream_report() -> str:
                 "data_vendors": {"prices": ["tushare", "yfinance"]},
                 "tool_vendors": {}, "version": "0.7.1"}
     parts = [("I. Analyst Team Reports", "1_analysts",
-              [("Market Analyst", "market.md", "# 市场")])]
+              [("Market Analyst", "market.md", "# 市场")]),
+             ("V. Portfolio Manager Decision", "5_portfolio",
+              [("Portfolio Manager", "decision.md", "维持配置。")])]
     return render_report("600519.SH", final_state, settings, parts)
 
 
@@ -107,3 +113,55 @@ def test_the_markup_we_match_is_still_produced_upstream():
     html = _upstream_report()
     for marker in report_page.UPSTREAM_MARKERS:
         assert marker in html, marker
+
+
+def test_a_chinese_report_gets_cjk_typography():
+    out = report_page.present(SAMPLE, "中文")
+
+    assert out.count('<style id="ta-cn">') == 1
+    assert out.index('<style id="ta-cn">') < out.index("</head>")
+    style = out[out.index('<style id="ta-cn">'):out.index("</style>", out.index('<style id="ta-cn">'))]
+    assert "Noto Serif CJK SC" in style
+    assert "--serif:" in style and "--sans:" in style
+    assert "17px/1.85" in style
+
+
+def test_an_english_report_gets_no_injected_style():
+    assert "ta-cn" not in report_page.present(SAMPLE, "English")
+
+
+def test_present_is_idempotent():
+    once = report_page.present(SAMPLE, "中文")
+
+    assert report_page.present(once, "中文") == once
+
+
+def test_the_chinese_report_leads_with_the_decision():
+    out = report_page.present(SAMPLE, "中文")
+
+    assert '<section class="ta-summary"' in out
+    assert out.index('<section class="ta-summary"') < out.index('<nav class="contents"')
+    assert "核心结论" in out
+    assert "维持当前配置，重点放在确定性更高的品种上。" in out
+    assert "组合在本周没有需要立即执行的调整；风险预算保持不变。" in out
+    assert "第三段不应出现在摘要里。" not in out.split('class="ta-summary"')[1].split("</section>")[0]
+    assert 'href="#s5"' in out
+    assert "阅读完整结论" in out
+
+
+def test_the_full_decision_section_survives_the_summary():
+    out = report_page.present(SAMPLE, "中文")
+
+    body = out[out.index('id="s5"'):]
+    for sentence in ("维持当前配置", "组合在本周没有需要立即执行的调整", "第三段不应出现在摘要里"):
+        assert sentence in body
+
+
+def test_a_report_without_a_decision_gets_no_summary_card():
+    start = SAMPLE.index('<section id="s5">')
+    html = SAMPLE[:start] + SAMPLE[SAMPLE.index("</section>", start) + len("</section>"):]
+
+    out = report_page.present(html, "中文")
+
+    assert 'class="ta-summary"' not in out   # the stylesheet may still be there
+    assert "核心结论" not in out

@@ -100,6 +100,7 @@
 | D-0050 | 本条提交 `fix(agents)` | fix | 空结果标记 `NO_ITEMS`（本地语义）；SSE 子图 namespace 映射修复（Web 本地）；RSS 无历史写入文档 | 无 | 无 | 新增 3 项测试，全量 1772 passed |
 | D-0051 | 本条提交 `fix(web)` | fix | 报告路由取 `.html` 兄弟文件（上游 `save_reports` 返回 `.md`）；事件写入加锁（并行分支线程池）；时间线补 `node.finished` 与中文标签；主题改为 paper 浅色 | 无 | 无 | 新增 7 项测试，全量 1779 passed |
 | D-0052 | `feat(web)` 分支 `feature/web-report-l10n-graph` | feat | 报告页服务时本地化（`report_page.present`）+ 运行页拓扑图（`progress_graph.topology` + `static/run-page.js`）+ 中文标签单一来源 `labels.py` | 无 | 无 | 新增 25 项测试，全量 1805 passed |
+| D-0053 | `feat(web)` 分支 `feature/web-report-summary` | feat | 中文报告：注入 CJK 排版（ta-cn 样式）+ 核心结论卡（PM 结论摘录置顶，锚点回第五节）；宽屏流程图分析师行动态居中于多头研究员 | 无 | 无 | 新增 10 项测试 |
 
 十余条下游提交合计新增代码与文档，**0 行上游改动**。下游与上游的唯一耦合是文档里登记的"脆弱耦合"，
 现在由 `tests/downstream/test_sync_guard.py`（12 组断言）机械锁定。
