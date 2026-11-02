@@ -18,31 +18,22 @@ the end date).
 
 from __future__ import annotations
 
-import html as html_module
-import os
-import re
-import urllib.parse
-import xml.etree.ElementTree as ET
-from datetime import UTC, date
-from email.utils import parsedate_to_datetime
+from datetime import date
 
-import requests
-
-from tradingagents.dataflows.errors import (
-    VendorNotConfiguredError,
-    VendorUnavailableError,
-)
 from tradingagents_cn.cache import cached
+from tradingagents_cn.vendors import rsshub
 from tradingagents_cn.vendors.common import no_rows, require_ashare
 
-BASE_ENV = "RSSHUB_BASE_URL"
-TOKEN_ENV = "RSSHUB_TOKEN"
+BASE_ENV = rsshub.BASE_ENV
+TOKEN_ENV = rsshub.TOKEN_ENV
 
 _TTL_SECONDS = 60 * 60
-_TIMEOUT = 20
-_TAG_RE = re.compile(r"<[^>]+>")
-_SPACE_RE = re.compile(r"\s+")
-_MAX_TEXT = 800
+
+# Kept as module attributes so tests can patch the seam without network access.
+_fetch = rsshub.fetch
+_clean = rsshub.clean
+_published = rsshub.published
+parse_items = rsshub.parse_items
 
 
 def xueqiu_code(symbol: str) -> str:
@@ -50,76 +41,6 @@ def xueqiu_code(symbol: str) -> str:
     canonical = require_ashare(symbol)
     code, market = canonical.split(".", 1)
     return f"{market}{code}"
-
-
-def _config() -> tuple[str, str]:
-    base = (os.environ.get(BASE_ENV) or "").strip().rstrip("/")
-    token = (os.environ.get(TOKEN_ENV) or "").strip()
-    if not base or not token:
-        raise VendorNotConfiguredError(
-            f"RSSHub needs {BASE_ENV} and {TOKEN_ENV} in the environment (or .env)"
-        )
-    return base, token
-
-
-def _fetch(path: str, **params) -> str:
-    """GET one route, mapping transport/access failures onto the router's types."""
-    base, token = _config()
-    query = urllib.parse.urlencode({"key": token, **{k: v for k, v in params.items() if v is not None}})
-    url = f"{base}{path}?{query}"
-    try:
-        response = requests.get(url, timeout=_TIMEOUT)
-    except requests.RequestException as exc:
-        raise VendorUnavailableError(f"RSSHub unreachable: {exc}") from exc
-    if response.status_code in (401, 403):
-        raise VendorNotConfiguredError(
-            f"RSSHub rejected the access key ({response.status_code}); check {TOKEN_ENV}"
-        )
-    if response.status_code >= 500:
-        raise VendorUnavailableError(
-            f"RSSHub route {path} failed upstream ({response.status_code})"
-        )
-    if response.status_code != 200:
-        raise VendorUnavailableError(f"RSSHub route {path} returned {response.status_code}")
-    return response.text
-
-
-def _clean(text: str | None) -> str:
-    if not text:
-        return ""
-    stripped = html_module.unescape(_TAG_RE.sub(" ", text))
-    return _SPACE_RE.sub(" ", stripped).strip()[:_MAX_TEXT]
-
-
-def _published(item: ET.Element) -> date | None:
-    raw = (item.findtext("pubDate") or "").strip()
-    if not raw:
-        return None
-    try:
-        return parsedate_to_datetime(raw).astimezone(UTC).date()
-    except (TypeError, ValueError):
-        return None
-
-
-def parse_items(xml_text: str, start: date | None = None, end: date | None = None) -> list[dict]:
-    """RSS items as dicts, window-filtered on the publication date (inclusive)."""
-    root = ET.fromstring(xml_text)
-    items = []
-    for item in root.findall("./channel/item"):
-        published = _published(item)
-        if start is not None and (published is None or published < start):
-            continue
-        if end is not None and (published is None or published > end):
-            continue
-        items.append(
-            {
-                "title": _clean(item.findtext("title")),
-                "link": (item.findtext("link") or "").strip(),
-                "published": published,
-                "text": _clean(item.findtext("description")),
-            }
-        )
-    return items
 
 
 def _window(start_date: str, end_date: str) -> tuple[date, date]:

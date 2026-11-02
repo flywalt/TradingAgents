@@ -94,6 +94,7 @@
 | D-0044 | `a048c65` `docs(b4)` | docs | 交互 spec 重写（8 项自审结论 + 13 条决策记录） | 无 | 无 | 不涉及代码 |
 | D-0045 | 本条提交 `feat(web)` | feat | Web 外壳 W1：FastAPI + SQLite + 单 worker + SSE + 报告/文件服务 + kviewer 钩子；测试 37 个新增 | 无 | 无 | 全量 1744 passed |
 | D-0046 | 本条提交 `feat(xueqiu)` | feat | 雪球 RSSHub：个股新闻接 `get_news`（CN 链 `xueqiu,yfinance`）、帖子/评论/热帖接口；`?key=` 鉴权、窗口过滤、HTML 清洗 | 无 | 无 | 10 项离线 + 2 项 live |
+| D-0047 | 本条提交 `feat(cls)` | feat | RSSHub 公共层抽取 + 财联社电报（全市场雷达/公司事件流，按代码提取聚合） | 无 | 无 | 7 项离线 + 2 项 live |
 
 十余条下游提交合计新增代码与文档，**0 行上游改动**。下游与上游的唯一耦合是文档里登记的"脆弱耦合"，
 现在由 `tests/downstream/test_sync_guard.py`（12 组断言）机械锁定。

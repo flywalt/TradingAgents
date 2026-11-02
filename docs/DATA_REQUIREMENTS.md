@@ -73,6 +73,21 @@
 **共同要求**：按 `screen`（标的）过滤、窗口内（防前视）、去重、限制条数（StockTwits 30 条）。
 **A 股替代需要明确的**：股吧/雪球的**文本**是否可合法稳定获取；若拿不到文本，是否接受用"资金面/龙虎榜"作为情绪代理（那是**换语义**，必须显式声明，不能假装是社交情绪）。
 
+## 5.1 监控组合（source：自建 RSSHub）
+
+| 层级 | 路由 | 用途 | 现状 |
+| --- | --- | --- | --- |
+| 全市场雷达 | `/cls/telegraph` | 突发事件、盘面异动、宏观 | 接口就绪（`cls.fetch_telegraph("all")`） |
+| 公司事件流 | `/cls/telegraph/announcement` | 上市公司公告/事件全量流 | 接口就绪；按正则提取 `(688613.SH)` 聚合，实测 **13/15** 条带代码 |
+| 个股级 | `/xueqiu/stock_info/<CODE>/news` | 单公司新闻 | ✅ 已接 `get_news`（CN 链） |
+| 个股级 | `/xueqiu/stock_info/<CODE>/announcement` | 单公司公告 | 接口就绪（`xueqiu.get_announcements`） |
+| 个股级 | `/xueqiu/stock_info/<CODE>/discuss`、`/stock_comments/<CODE>` | 帖子/评论（情绪） | 接口就绪，未接 agent |
+| 盘中热点 | `/xueqiu/hots` | 全市场热帖 | 接口就绪 |
+
+CLS 完整分类（源码确认）：`all / watch / announcement / red / remind / fund / hk / hk_us`。
+**设计要点**：CLS 公司分类是**全市场流**，按代码提取后再按公司聚合；雪球路由天生按个股，不需要过滤。
+CLS 代码覆盖不是 100%（比亚迪、赛力斯两条实测无代码），所以**个股精确跟踪以雪球路由为准，CLS 用于事件流兜底**。
+
 ## 6. 已解决 / 未解决一览
 
 | 接口 | 状态 |
@@ -84,6 +99,7 @@
 | `get_macro_indicators` | ✅ 已封装（CN profile：CPI/PPI/GDP/M2/社融/PMI/SHIBOR；LPR/10Y 显式拒绝） |
 | `get_prediction_markets` | ⚠️ 语义不适用，待决定（§4） |
 | 社交情绪 | ⚠️ 雪球接口就绪（`fetch_stock_comments` / `fetch_stock_items(discuss)` / `fetch_hot_posts`），**尚未接 agent** |
+| 公司事件（市场级） | ✅ CLS `announcement` 接口就绪 + 代码提取（未接线 agent） |
 
 ## 7. B3 前必须先确认的三件事
 

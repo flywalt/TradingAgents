@@ -72,6 +72,8 @@
 | `tradingagents_cn/vendors/tushare/insider.py` | 高管/股东增减持（按公告日） |
 | `tradingagents_cn/vendors/tushare/macro.py` | 中国宏观序列（CPI/PPI/GDP/M2/社融/PMI/SHIBOR；LPR/10Y 显式拒绝） |
 | `tradingagents_cn/vendors/xueqiu.py` | 雪球 RSSHub：个股新闻（路由 `get_news`）、帖子/评论/热帖（接口，未接 agent） |
+| `tradingagents_cn/vendors/rsshub.py` | RSSHub 公共层：`?key=` 鉴权、RSS 解析、日期窗口、HTML 清洗 |
+| `tradingagents_cn/vendors/cls.py` | 财联社电报：7 分类 + 全市场雷达、公司事件流按代码提取聚合 |
 | `tradingagents_cn/vendors/tushare/flows.py` | 资金流/北向/两融/龙虎榜（仅接口） |
 | `tradingagents_cn/vendors/tushare/index.py` | 指数行情与成分权重（独立命名空间） |
 | `tradingagents_cn/vendors/tushare/calendar.py` | `trade_cal` → 交易日历 |
@@ -96,6 +98,8 @@
 | `tests/downstream/test_macro.py` | 宏观别名/单位/时间窗/不可用拒绝/路由 |
 | `tests/downstream/test_xueqiu.py` | 雪球 RSS 解析/窗口/HTML 清洗/路由/拒绝语义 |
 | `tests/downstream/test_xueqiu_live.py` | **真实 RSSHub** 2 项（`-m integration`） |
+| `tests/downstream/test_cls.py` | CLS 代码提取/窗口/公司过滤/拒绝语义 |
+| `tests/downstream/test_cls_live.py` | **真实 CLS 流**：代码覆盖率 ≥70% + 雷达非空 |
 | `tests/downstream/test_web_jobs.py` | 队位、崩溃恢复、事件序号 |
 | `tests/downstream/test_web_errors.py` | 错误分类 |
 | `tests/downstream/test_web_security.py` | token 比较、路径白名单 |
