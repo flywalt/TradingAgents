@@ -39,14 +39,16 @@ def suggest(query: str, limit: int = LIMIT) -> list[dict]:
         return []
 
     needle = query.casefold()
-    code_prefix, code_contains, name_prefix, name_contains = [], [], [], []
+    exact, code_prefix, code_contains, name_prefix, name_contains = [], [], [], [], []
     for row in table:
         code = str(row.get("ts_code") or "")
         name = str(row.get("name") or "").casefold()
         if not code or not name:
             continue
         lowered = code.casefold()
-        if lowered.startswith(needle):
+        if lowered.split(".")[0] == needle:
+            exact.append(row)
+        elif lowered.startswith(needle):
             code_prefix.append(row)
         elif needle in lowered:
             code_contains.append(row)
@@ -55,6 +57,6 @@ def suggest(query: str, limit: int = LIMIT) -> list[dict]:
         elif needle in name:
             name_contains.append(row)
 
-    ranked = code_prefix + code_contains + name_prefix + name_contains
+    ranked = exact + code_prefix + code_contains + name_prefix + name_contains
     return [{"symbol": row["ts_code"], "name": row["name"]}
             for row in ranked[:limit]]

@@ -59,3 +59,15 @@ def test_a_broken_source_answers_nothing():
         assert s.suggest("6005") == []
     finally:
         s._listed_table = original
+
+
+def test_the_whole_code_wins_over_longer_prefixes():
+    table = [{"ts_code": "600598.SH", "name": "北大荒"},
+             {"ts_code": "600519.SH", "name": "贵州茅台"}]
+    import tradingagents_web.search as s
+    original = s._listed_table
+    s._listed_table = lambda: table
+    try:
+        assert s.suggest("600519")[0]["symbol"] == "600519.SH"
+    finally:
+        s._listed_table = original
