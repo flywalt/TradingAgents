@@ -18,6 +18,7 @@ from fastapi.responses import (
     HTMLResponse,
     JSONResponse,
     RedirectResponse,
+    Response,
     StreamingResponse,
 )
 from fastapi.staticfiles import StaticFiles
@@ -32,7 +33,7 @@ from tradingagents_cn.identity import resolve_identity
 from tradingagents_cn.market import CN_A_SHARE, select_profile
 from tradingagents_cn.symbols import try_normalize
 
-from . import db, jobs, labels, security
+from . import db, jobs, labels, report_page, security
 from .errors import QueueFullError, classify
 from .worker import Worker
 
@@ -360,14 +361,21 @@ def create_app(
         if job is None or not job.get("report_path"):
             raise HTTPException(status_code=404, detail="no report yet")
         path = Path(job["report_path"])
-        if not path.is_file():
-            raise HTTPException(status_code=404, detail="report missing on disk")
         served, media_type = served_report(path)
+        # Check the file we are about to send, not the one recorded in the job:
+        # the kernel records complete_report.md but writes the HTML beside it.
+        if not served.is_file():
+            raise HTTPException(status_code=404, detail="report missing on disk")
         headers = {"X-Content-Type-Options": "nosniff"}
-        if media_type == "text/html":
-            headers["Content-Security-Policy"] = (
-                "sandbox; default-src 'none'; style-src 'unsafe-inline'")
-        return FileResponse(served, media_type=media_type, headers=headers)
+        if media_type != "text/html":
+            return FileResponse(served, media_type=media_type, headers=headers)
+        headers["Content-Security-Policy"] = (
+            "sandbox; default-src 'none'; style-src 'unsafe-inline'")
+        # The artifact stays as the kernel wrote it; only the handed-over copy is
+        # translated into the run's language.
+        return Response(content=report_page.present(served.read_text(encoding="utf-8"),
+                                                   job.get("language")),
+                        media_type="text/html", headers=headers)
 
     @app.get("/runs/{run_id}/files/{name}", dependencies=[Depends(require_read)])
     def file(run_id: str, name: str, session=Depends(_conn)):  # noqa: B008

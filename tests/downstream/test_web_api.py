@@ -235,3 +235,51 @@ def test_a_markdown_only_report_is_served_as_plain_text(client, tmp_path):
 
     assert response.headers["content-type"].startswith("text/plain")
     assert response.text == "# plain markdown"
+
+
+def test_the_report_page_follows_the_run_language(client, tmp_path):
+    report_dir = tmp_path / "report"
+    report_dir.mkdir()
+    (report_dir / "complete_report.html").write_text(
+        '<!doctype html><html lang="en"><body><p class="date">Analysis of 2026-11-02</p>'
+        '<a class="to-top" href="#top">Top</a></body></html>', encoding="utf-8")
+
+    conn = db.connect(tmp_path / "state.db")
+    try:
+        run_id = jobs.create(conn, symbol="600519.SH", market="CN", profile="CN_A_SHARE",
+                             trade_date="2026-10-30", analysts=["market"], language="中文",
+                             strict=False, portfolio_json=None)
+        jobs.finish(conn, run_id, rating="Hold", run_dir=str(tmp_path),
+                    report_path=str(report_dir / "complete_report.md"))
+    finally:
+        conn.close()
+
+    response = client.get(f"/runs/{run_id}/report", headers=AUTH)
+
+    assert response.status_code == 200
+    assert '<html lang="zh-CN">' in response.text
+    assert "回到顶部" in response.text
+    assert response.headers["content-type"].startswith("text/html")
+
+
+def test_an_english_report_is_served_as_written(client, tmp_path):
+    report_dir = tmp_path / "report"
+    report_dir.mkdir()
+    (report_dir / "complete_report.html").write_text(
+        '<!doctype html><html lang="en"><body><a class="to-top" href="#top">Top</a>'
+        '</body></html>', encoding="utf-8")
+
+    conn = db.connect(tmp_path / "state.db")
+    try:
+        run_id = jobs.create(conn, symbol="AAPL", market="US", profile="UPSTREAM_DEFAULT",
+                             trade_date="2026-10-30", analysts=["market"], language="English",
+                             strict=False, portfolio_json=None)
+        jobs.finish(conn, run_id, rating="Hold", run_dir=str(tmp_path),
+                    report_path=str(report_dir / "complete_report.md"))
+    finally:
+        conn.close()
+
+    response = client.get(f"/runs/{run_id}/report", headers=AUTH)
+
+    assert '<html lang="en">' in response.text
+    assert response.text.count("回到顶部") == 0
