@@ -139,3 +139,31 @@ def test_the_analyst_row_is_centred_on_the_debate_entry(analysts):
 
     row_centre = (min(centres) + max(centres)) / 2
     assert abs(row_centre - entry) <= 1, (analysts, row_centre, entry)
+
+
+@pytest.mark.parametrize("width", ["wide", "narrow"])
+def test_the_debate_merges_into_one_line_before_the_manager(width):
+    """Two debaters, one outcome: a shared merge line, a single entry drop."""
+    layout = progress_graph.topology(ALL)[width]
+    boxes = _boxes(layout)
+    manager = boxes["research-manager"]
+    into_manager = [e for e in layout["edges"] if e["to"] == "research-manager"]
+
+    assert {e["from"] for e in into_manager} == {"bull", "bear"}
+    entries = set()
+    for edge in into_manager:
+        merge_y = edge["d"].split(" ")[3]
+        assert edge["d"].endswith(f"V {manager['y']}")
+        entries.add((merge_y, edge["d"].split(" H ")[-1].split(" ")[0]))
+    assert len(entries) == 1                      # one merge line, one entry x
+
+
+@pytest.mark.parametrize("width", ["wide", "narrow"])
+def test_a_groups_label_band_stays_clear_of_its_boxes(width):
+    """The label sits in the band above the boxes, never on top of them."""
+    layout = progress_graph.topology(ALL)[width]
+    boxes = _boxes(layout)
+
+    for group in layout["groups"]:
+        tops = [boxes[m]["y"] for m in group["members"]]
+        assert min(tops) - group["y"] >= 20, (width, group["id"])

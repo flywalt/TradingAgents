@@ -54,73 +54,77 @@ _CORE = (
 )
 
 _WIDE = {
-    "viewBox": "0 0 960 740",
+    "viewBox": "0 0 960 770",
     "height": 48,
-    "analyst_y": 52,
+    "analyst_y": 60,
     "analyst_width": 150,
     "analyst_gap": 26,
     # The analyst row and both group entries share this spine, so the page has
     # one axis from the input row down to the portfolio.
     "centre": 480.0,
-    "bus_y": 136.0,
+    "bus_y": 150.0,
+    "merge_y": 268.0,
     "default_width": 150,
     "boxes": {
         # the memory log is a feedback node beside the portfolio it feeds,
         # not part of the input row - in both layouts, telling one story
-        "memory": (720, 664),
-        "bull": (303, 178),
-        "bear": (493, 178),
-        "research-manager": (405, 292),
-        "trader": (405, 372),
-        "risk-aggressive": (240, 470),
-        "risk-conservative": (570, 470),
-        "risk-neutral": (405, 560),
-        "portfolio": (405, 664),
+        "memory": (720, 692),
+        "bull": (303, 190),
+        "bear": (493, 190),
+        "research-manager": (405, 304),
+        "trader": (405, 392),
+        "risk-aggressive": (240, 498),
+        "risk-conservative": (570, 498),
+        "risk-neutral": (405, 588),
+        "portfolio": (405, 692),
     },
     "margin_x": 944.0,
+    # Every group opens with a label band before its boxes, so a label never
+    # sits on top of a box.
     "groups": [
         {"id": "input", "label": "输入", "members": "analysts",
-         "x": 127, "y": 34, "w": 706, "h": 80},
+         "x": 127, "y": 34, "w": 706, "h": 94},
         {"id": "research", "label": "研究辩论", "members": ["bull", "bear"],
-         "x": 289, "y": 150, "w": 382, "h": 90},
+         "x": 289, "y": 164, "w": 382, "h": 92},
         {"id": "risk", "label": "风险辩论 · 循环", "members":
             ["risk-aggressive", "risk-conservative", "risk-neutral"],
-         "x": 226, "y": 456, "w": 508, "h": 166},
+         "x": 226, "y": 472, "w": 508, "h": 178},
     ],
 }
 
 _NARROW = {
-    "viewBox": "0 0 360 830",
+    "viewBox": "0 0 360 930",
     "height": 44,
-    "analyst_y": 36,
+    "analyst_y": 50,
     "analyst_width": 240,
     "analyst_x": 60,
     "analyst_gap": 16,
+    "merge_y": 424.0,
     "default_width": 240,
     "boxes": {
-        "memory": (60, 764),
-        "bull": (20, 316),
-        "bear": (190, 316),
-        "research-manager": (60, 408),
-        "trader": (60, 476),
-        "risk-aggressive": (20, 544),
-        "risk-conservative": (190, 544),
-        "risk-neutral": (105, 628),
-        "portfolio": (60, 700),
+        "memory": (60, 860),
+        "bull": (20, 344),
+        "bear": (190, 344),
+        "research-manager": (60, 456),
+        "trader": (60, 524),
+        "risk-aggressive": (20, 622),
+        "risk-conservative": (190, 622),
+        "risk-neutral": (105, 706),
+        "portfolio": (60, 796),
     },
     "widths": {"bull": 150, "bear": 150,
                "risk-aggressive": 100, "risk-conservative": 100, "risk-neutral": 100},
     "margin_x": 8.0,
     "spine_x": 324.0,
-    "bus_y": 268.0,
+    "bus_y": 310.0,
     "groups": [
         {"id": "input", "label": "输入", "members": "analysts",
-         "x": 48, "y": 24, "w": 264, "h": 248},
+         "x": 48, "y": 30, "w": 264, "h": 256},
         {"id": "research", "label": "研究辩论", "members": ["bull", "bear"],
-         "x": 6, "y": 296, "w": 348, "h": 88},
+         "x": 6, "y": 318, "w": 348, "h": 92},
         {"id": "risk", "label": "风险辩论 · 循环", "members":
             ["risk-aggressive", "risk-conservative", "risk-neutral"],
-         "x": 8, "y": 524, "w": 344, "h": 154},
+         "x": 8, "y": 596, "w": 344, "h": 168},
     ],
 }
 
@@ -244,11 +248,17 @@ def _edges(nodes: dict[str, dict], spec: dict) -> list[dict]:
                            _enter(nodes[node_id], research["x"] + research["w"] / 2,
                                   research["y"], spec["bus_y"])))
     edges.append(_edge("bull", "bear", "debate", _across(nodes["bull"], nodes["bear"])))
+    # the debate's outcome is one thing: both debaters meet a shared merge line
+    # and a single drop enters the manager - not two competing elbows
     manager = nodes["research-manager"]
-    for source, offset in (("bull", 1), ("bear", 2)):
-        to_x = manager["x"] + manager["w"] * offset / 3
+    entry = _centre_x(manager)
+    for source in ("bull", "bear"):
+        src = nodes[source]
+        x1 = _centre_x(src)
+        y1 = src["y"] + src["h"]
         edges.append(_edge(source, "research-manager", "flow",
-                           _drop(nodes[source], manager, to_x)))
+                           f"M {_n(x1)} {_n(y1)} V {_n(spec['merge_y'])} "
+                           f"H {_n(entry)} V {_n(manager['y'])}"))
     edges.append(_edge("research-manager", "trader", "flow",
                        _drop(nodes["research-manager"], nodes["trader"])))
 

@@ -9,7 +9,7 @@
          data-terminal="{{ (run.status in ('succeeded', 'failed')) | tojson }}">
   <div class="run-record__body">
     <div class="run-record__id">
-      <h1 class="run-symbol">{{ run.symbol }}</h1>
+      <h1 class="run-symbol">{{ (run.display_name ~ " · " if run.display_name else "") ~ run.symbol }}</h1>
       <dl class="facts">
         <div><dt>交易日</dt><dd class="mono">{{ run.trade_date }}</dd></div>
         <div><dt>市场</dt><dd title="{{ run.profile }}">{{ profile_names.get(run.profile, run.profile) }}</dd></div>

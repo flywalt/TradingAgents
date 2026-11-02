@@ -227,6 +227,15 @@ def create_app(
         return {"symbol": canonical, "market": profile.market,
                 "profile": profile.key, "name": name}
 
+    def _display_name(fields: dict) -> str | None:
+        """The company's short name, best-effort: the reader knows it first."""
+        try:
+            if fields["profile"] == CN_A_SHARE.key:
+                return resolve_identity(fields["symbol"]).get("name")
+            return resolve_instrument_identity(fields["symbol"]).get("name")
+        except Exception:  # noqa: BLE001 - identity is best-effort
+            return None
+
     @app.post("/api/runs", status_code=202, dependencies=[Depends(require_write)])
     def create_run(payload: RunRequest, session=Depends(_conn)):  # noqa: B008
         try:
@@ -240,6 +249,7 @@ def create_app(
             profile=fields["profile"], trade_date=fields["trade_date"],
             analysts=fields["analysts"], language=fields["language"],
             strict=fields["strict"], portfolio_json=fields["portfolio_json"],
+            display_name=_display_name(fields),
         )
         background.submit(run_id)
         return {"id": run_id, "position": jobs.queue_position(session, run_id)}
@@ -377,7 +387,8 @@ def create_app(
         # The artifact stays as the kernel wrote it; only the handed-over copy is
         # translated into the run's language.
         return Response(content=report_page.present(served.read_text(encoding="utf-8"),
-                                                   job.get("language")),
+                                                   job.get("language"),
+                                                   job.get("display_name")),
                         media_type="text/html", headers=headers)
 
     @app.get("/runs/{run_id}/files/{name}", dependencies=[Depends(require_read)])

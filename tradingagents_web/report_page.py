@@ -33,6 +33,7 @@ UPSTREAM_MARKERS = (
     '<dt>Data vendors</dt>',
     '<dt>Version</dt>',
     '<dt>Memory log</dt>',
+    '<span class="ticker">',
     '<span class="rating ',
     'aria-label="Sections"',
     ': TradingAgents report</title>',
@@ -97,13 +98,15 @@ _RATING_SPAN = re.compile(r'<span class="rating ([a-z]+)">([A-Za-z]+)</span>')
 #: line; colour, dark mode and print all keep using upstream's variables.
 _CN_STYLE = """<style id="ta-cn">
 :root {
-  --serif: Charter, "Bitstream Charter", "Sitka Text", Cambria, Georgia,
-    "Noto Serif CJK SC", "Source Han Serif SC", "Source Han Serif CN",
-    "Songti SC", "STSong", SimSun, serif;
-  --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial,
-    "PingFang SC", "Hiragino Sans GB", "Noto Sans CJK SC", "Microsoft YaHei", sans-serif;
+  /* The CJK family leads so digits, Latin and Han all come from one design:
+     with Charter first, a line mixes DejaVu Serif digits with Noto Han and
+     the numbers read broken. Digits sit on tabular widths for the tables. */
+  --serif: "Noto Serif CJK SC", "Source Han Serif SC", "Source Han Serif CN",
+    "Songti SC", STSong, SimSun, Charter, "Bitstream Charter", Georgia, serif;
+  --sans: "Noto Sans CJK SC", "PingFang SC", "Hiragino Sans GB",
+    "Microsoft YaHei", system-ui, -apple-system, "Segoe UI", sans-serif;
 }
-body { font: 17px/1.85 var(--serif); }
+body { font: 17px/1.85 var(--serif); font-variant-numeric: tabular-nums lining-nums; }
 /* The kernel demotes an agent's own markdown headings three levels (# -> h4,
  * ## -> h5), so h4-h6 are the in-text section titles a reader navigates by.
  * Upstream styled them all at 0.95rem - smaller than the 17px paragraphs under
@@ -223,13 +226,32 @@ def _summary_card(html: str) -> str:
             f"</section>")
 
 
-def present(html: str, language: str | None) -> str:
+_TICKER_SPAN = re.compile(r'<span class="ticker">([^<]+)</span>')
+
+
+def _lead_with_name(html: str, name: str) -> str:
+    """The company leads where there is room; the code always follows it."""
+    found = _TICKER_SPAN.search(html)
+    if not found:
+        return html
+    ticker = found.group(1)
+
+    def replace(match: re.Match) -> str:
+        return f'<span class="ticker">{name} · {match.group(1)}</span>'
+
+    html = _TICKER_SPAN.sub(replace, html, count=1)
+    return html.replace(f"<title>{ticker} ", f"<title>{name} {ticker} ", 1)
+
+
+def present(html: str, language: str | None, name: str | None = None) -> str:
     """Return the page as the run's language asked for it."""
     if not _is_chinese(language):
-        return html
+        return _lead_with_name(html, name) if name else html
     for old, new in _replacements():
         html = html.replace(old, new)
     html = _RATING_SPAN.sub(_localise_rating, html)
+    if name:
+        html = _lead_with_name(html, name)
     # Lift the decision before the glossary runs, so the card's excerpt is
     # translated by the same pass as the page around it.
     if 'class="ta-summary"' not in html:

@@ -303,3 +303,41 @@ def test_the_run_page_draws_the_graph_for_the_selected_analysts(client, tmp_path
     assert "情绪分析师" not in page.text         # that analyst was not selected
     assert page.text.count("<script") == 1
     assert "/static/run-page.js" in page.text
+
+
+def test_a_run_stores_and_shows_the_company_name(client, monkeypatch, tmp_path):
+    import tradingagents_web.app as web_app
+
+    monkeypatch.setattr(web_app, "resolve_identity",
+                        lambda symbol: {"name": "贵州茅台"})
+    response = client.post("/api/runs", headers=AUTH, json={
+        "symbol": "600519.SH", "date": "2026-10-30", "analysts": ["market"],
+        "language": "中文",
+    })
+
+    body = response.json()
+    assert response.status_code == 202
+    page = client.get(f"/runs/{body['id']}", headers=AUTH)
+    assert "贵州茅台 · 600519.SH" in page.text
+
+
+def test_the_report_leads_with_the_company_name(client, tmp_path):
+    report_dir = tmp_path / "report"
+    report_dir.mkdir()
+    (report_dir / "complete_report.html").write_text(
+        '<!doctype html><html lang="en"><body><h1><span class="ticker">600519.SH'
+        '</span></h1><a class="to-top" href="#top">Top</a></body></html>', encoding="utf-8")
+
+    conn = db.connect(tmp_path / "state.db")
+    try:
+        run_id = jobs.create(conn, symbol="600519.SH", market="CN", profile="CN_A_SHARE",
+                             trade_date="2026-10-30", analysts=["market"], language="中文",
+                             strict=False, portfolio_json=None, display_name="贵州茅台")
+        jobs.finish(conn, run_id, rating="Hold", run_dir=str(tmp_path),
+                    report_path=str(report_dir / "complete_report.md"))
+    finally:
+        conn.close()
+
+    page = client.get(f"/runs/{run_id}/report", headers=AUTH)
+
+    assert "贵州茅台 · 600519.SH" in page.text
