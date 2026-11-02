@@ -237,6 +237,9 @@ rating = run_rating(final)                                   # 五档 or REVIEW
   正文一个字不动；英文运行原样返回。
 - 与上游标记的耦合登记在 `docs/UPSTREAM_DELTA.md` 的脆弱耦合栏，由
   `test_the_markup_we_match_is_still_produced_upstream` 在同步时先报错。
+- **中文排版**：同一层注入 `<style id="ta-cn">`——`--serif`/`--sans` 补中文字族、正文行距 1.85。
+- **核心结论卡**：以 `<h3 …>Portfolio Manager</h3>` 为锚，把第五节前两段摘到页首
+  `</header>` 之后，带"阅读完整结论"锚点；第五节原文不动，无决策节的报告不注入。
 
 ### 9.2 流程图（拓扑与点亮）
 

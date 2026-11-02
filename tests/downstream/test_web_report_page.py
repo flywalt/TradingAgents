@@ -89,7 +89,9 @@ def _upstream_report() -> str:
                 "data_vendors": {"prices": ["tushare", "yfinance"]},
                 "tool_vendors": {}, "version": "0.7.1"}
     parts = [("I. Analyst Team Reports", "1_analysts",
-              [("Market Analyst", "market.md", "# 市场")])]
+              [("Market Analyst", "market.md", "# 市场")]),
+             ("V. Portfolio Manager Decision", "5_portfolio",
+              [("Portfolio Manager", "decision.md", "维持配置。")])]
     return render_report("600519.SH", final_state, settings, parts)
 
 

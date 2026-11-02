@@ -36,6 +36,12 @@ UPSTREAM_MARKERS = (
     '<span class="rating ',
     'aria-label="Sections"',
     ': TradingAgents report</title>',
+    '</head>',
+    '</header>',
+    '<h3 id="s',
+    'Portfolio Manager</h3>',
+    '--serif:',
+    '--sans:',
 )
 
 _DETAIL_LABELS = {
