@@ -201,4 +201,11 @@ def test_the_typography_scale_is_declared_for_chinese():
 
     style = out[out.index('<style id="ta-cn">'):out.index("</style>")]
     assert "main h2" in style and "1.5rem" in style      # 一、 chapters lead
-    assert "main h4" in style                            # markdown sub-heads below
+    # the kernel demotes an agent's own headings three levels (## -> h5); the
+    # scale must stay monotonic and never dip below body size, or a section
+    # titled "一、" renders smaller than the paragraph under it
+    for rule in ("main h4", "main h5", "main h6"):
+        assert rule in style, rule
+    assert "1.13rem" in style                            # h4 >= body
+    assert "1.06rem" in style                            # h5 == body, heavier
+    assert ".ta-summary h2" in style and "1.13rem" in style

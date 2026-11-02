@@ -104,13 +104,18 @@ _CN_STYLE = """<style id="ta-cn">
     "PingFang SC", "Hiragino Sans GB", "Noto Sans CJK SC", "Microsoft YaHei", sans-serif;
 }
 body { font: 17px/1.85 var(--serif); }
+/* The kernel demotes an agent's own markdown headings three levels (# -> h4,
+ * ## -> h5), so h4-h6 are the in-text section titles a reader navigates by.
+ * Upstream styled them all at 0.95rem - smaller than the 17px paragraphs under
+ * them, inverting the hierarchy. Monotonic scale, nothing below body size. */
 main h2 { font: 700 1.5rem/1.3 var(--sans); letter-spacing: 0; }
-main h3 { font: 600 1.15rem/1.35 var(--sans); }
-main h4 { font: 600 1.05rem/1.4 var(--sans); color: var(--ink); }
-main h5, main h6 { font: 600 0.95rem/1.4 var(--sans); }
+main h3 { font: 650 1.19rem/1.35 var(--sans); }
+main h4 { font: 650 1.13rem/1.4 var(--sans); }
+main h5 { font: 700 1.06rem/1.45 var(--sans); }
+main h6 { font: 600 1rem/1.4 var(--sans); color: var(--muted); }
 .ta-summary { margin: 1.75rem 0 0; padding: 1.05rem 1.25rem; border: 1px solid var(--edge);
   border-left: 3px solid var(--accent); border-radius: 6px; background: var(--wash); }
-.ta-summary h2 { margin: 0 0 0.6rem; font: 600 1.05rem/1.3 var(--sans); }
+.ta-summary h2 { margin: 0 0 0.6rem; font: 650 1.13rem/1.3 var(--sans); }
 .ta-summary p { margin: 0 0 0.7rem; font-size: 0.95rem; }
 .ta-summary p:last-child { margin-bottom: 0; }
 .ta-summary__more { font: 0.85rem/1.4 var(--sans); }
