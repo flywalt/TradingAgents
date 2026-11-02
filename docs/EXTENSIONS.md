@@ -57,6 +57,7 @@
 | `tradingagents_web/security.py` | 读写 token、CORS、路径白名单 |
 | `tradingagents_web/labels.py` | 中文标签唯一来源：评级/内核节点/分析师映射/报告章节 |
 | `tradingagents_web/report_page.py` | 报告 HTML 的**服务时**本地化（磁盘产物不动） |
+| `tradingagents_web/search.py` | 模糊检索：代码/名称片段 → 建议（tushare stock_basic，24h 缓存，失败即空） |
 | `tradingagents_web/progress_graph.py` | 运行拓扑与宽/窄两套坐标，边语义 flow/debate/bypass |
 | `tradingagents_web/static/run-page.js` | 运行页脚本：流程图、事件时间线、计时器、重跑（一页一个 script） |
 
@@ -116,6 +117,7 @@
 | `tests/downstream/test_web_runner_worker.py` | 执行序列/产物/失败分类/worker 恢复 |
 | `tests/downstream/test_web_api.py` | 鉴权/校验/队列/页面/SSE/文件越权/报告语言/流程图 |
 | `tests/downstream/test_web_labels.py` | 中文标签覆盖全部内核节点与评级枚举 |
+| `tests/downstream/test_web_search.py` | 模糊检索：代码/名称/排序/上限/数据源故障降级 |
 | `tests/downstream/test_web_report_page.py` | 报告本地化 + 上游标记守卫 |
 | `tests/downstream/test_web_progress_graph.py` | 拓扑/两套布局/边语义/未选分析师不画 |
 | `tests/downstream/test_checkpoint_behavior.py` | 版本/口径/脏工作区使 checkpoint 失效 |

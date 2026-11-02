@@ -178,11 +178,36 @@ def test_narrow_the_debate_merges_into_one_line_before_the_manager():
 
 
 @pytest.mark.parametrize("width", ["wide", "narrow"])
-def test_a_groups_label_band_stays_clear_of_its_boxes(width):
-    """The label sits in the band above the boxes, never on top of them."""
+def test_every_group_carries_the_same_frame(width):
+    """One system: same label band above, same padding below, in every group."""
     layout = progress_graph.topology(ALL)[width]
     boxes = _boxes(layout)
 
+    bands, feet = [], []
     for group in layout["groups"]:
         tops = [boxes[m]["y"] for m in group["members"]]
-        assert min(tops) - group["y"] >= 20, (width, group["id"])
+        bottoms = [boxes[m]["y"] + boxes[m]["h"] for m in group["members"]]
+        bands.append(min(tops) - group["y"])
+        feet.append(group["y"] + group["h"] - max(bottoms))
+    assert len(set(bands)) == 1 and bands[0] == 26, (width, bands)
+    assert len(set(feet)) == 1 and feet[0] == 26, (width, feet)
+
+
+@pytest.mark.parametrize("width", ["wide", "narrow"])
+def test_the_input_stage_hands_over_with_one_line(width):
+    """Group to group: which analyst works shows on its card, not on the wire."""
+    layout = progress_graph.topology(ALL)[width]
+    groups = {g["id"]: g for g in layout["groups"]}
+
+    stage_lines = [e for e in layout["edges"]
+                   if e["from"] == "input" and e["to"] == "research"]
+    assert len(stage_lines) == 1
+    assert not [e for e in layout["edges"] if e["from"].startswith("analyst-")]
+    # anchored on the group edges, on the axis of travel
+    source, target = groups["input"], groups["research"]
+    d = stage_lines[0]["d"]
+    if width == "wide":
+        assert d == f"M {source['x'] + source['w']:g} 215 H {target['x']:g}"
+    else:
+        assert d == (f"M {source['x'] + source['w'] / 2:g} "
+                     f"{source['y'] + source['h']:g} V {target['y']:g}")

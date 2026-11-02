@@ -78,14 +78,16 @@ _WIDE = {
     },
     # Every group opens with a label band before its boxes, so a label never
     # sits on top of a box.
+    # Every group carries the same frame: 26 above the label band, 26 below
+    # the last box - the three containers must read as one system.
     "groups": [
         {"id": "input", "label": "输入", "members": "analysts",
-         "x": 6, "y": 71, "w": 158, "h": 288},
+         "x": 6, "y": 69, "w": 158, "h": 292},
         {"id": "research", "label": "研究辩论", "members": ["bull", "bear"],
-         "x": 196, "y": 116, "w": 178, "h": 198},
+         "x": 196, "y": 126, "w": 178, "h": 178},
         {"id": "risk", "label": "风险辩论 · 循环", "members":
             ["risk-aggressive", "risk-conservative", "risk-neutral"],
-         "x": 786, "y": 96, "w": 296, "h": 238},
+         "x": 786, "y": 94, "w": 296, "h": 242},
     ],
 }
 
@@ -116,12 +118,12 @@ _NARROW = {
     "bus_y": 310.0,
     "groups": [
         {"id": "input", "label": "输入", "members": "analysts",
-         "x": 48, "y": 30, "w": 264, "h": 256},
+         "x": 48, "y": 24, "w": 264, "h": 276},
         {"id": "research", "label": "研究辩论", "members": ["bull", "bear"],
-         "x": 6, "y": 318, "w": 348, "h": 92},
+         "x": 6, "y": 318, "w": 348, "h": 96},
         {"id": "risk", "label": "风险辩论 · 循环", "members":
             ["risk-aggressive", "risk-conservative", "risk-neutral"],
-         "x": 8, "y": 596, "w": 344, "h": 168},
+         "x": 8, "y": 596, "w": 344, "h": 180},
     ],
 }
 
@@ -257,13 +259,12 @@ def _edges_horizontal(nodes: dict[str, dict], spec: dict, groups: dict) -> list[
     research, risk = groups["research"], groups["risk"]
     spine = spec["spine_y"]
 
-    # analysts ride a vertical bus and enter the debate stage once
-    for node_id in (n for n in nodes if n.startswith("analyst-")):
-        src = nodes[node_id]
-        cy = src["y"] + src["h"] / 2
-        edges.append(_edge(node_id, "research", "flow",
-                           f"M {src['x'] + src['w']} {_n(cy)} H {_n(spec['bus_x'])} "
-                           f"V {_n(spine)} H {_n(research['x'])}"))
+    # one stage line: the input group as a whole hands over to the debate
+    # stage. Which analysts are working shows on their cards, not on the wire.
+    input_group = groups["input"]
+    edges.append(_edge("input", "research", "flow",
+                       f"M {_n(_right_of(input_group))} {_n(spine)} "
+                       f"H {_n(research['x'])}"))
     edges.append(_edge("bull", "bear", "debate",
                        f"M {_n(_centre_x(nodes['bull']))} {_n(nodes['bull']['y'] + nodes['bull']['h'])} "
                        f"V {_n(nodes['bear']['y'])}"))
@@ -280,9 +281,9 @@ def _edges_horizontal(nodes: dict[str, dict], spec: dict, groups: dict) -> list[
                        f"{_n(nodes['risk-aggressive']['y'] + nodes['risk-aggressive']['h'])} "
                        f"V {_n(nodes['risk-conservative']['y'])}"))
     edges.append(_edge("risk-aggressive", "risk-neutral", "debate",
-                       _diagonal(nodes["risk-aggressive"], nodes["risk-neutral"], "right", "left")))
+                       _diagonal(nodes["risk-aggressive"], nodes["risk-neutral"], "right", "top")))
     edges.append(_edge("risk-conservative", "risk-neutral", "debate",
-                       _diagonal(nodes["risk-conservative"], nodes["risk-neutral"], "right", "left")))
+                       _diagonal(nodes["risk-conservative"], nodes["risk-neutral"], "right", "bottom")))
     edges.append(_edge("risk", "portfolio", "flow",
                        f"M {_n(_right_of(risk))} {_n(spine)} H {_n(nodes['portfolio']['x'])}"))
     # feedback: straight up into the portfolio's bottom port
@@ -297,16 +298,13 @@ def _edges_vertical(nodes: dict[str, dict], spec: dict, groups: dict) -> list[di
     """The narrow picture: one vertical spine, debate pairs side by side."""
     edges = []
     research, risk = groups["research"], groups["risk"]
-    analysts = [node_id for node_id in nodes if node_id.startswith("analyst-")]
 
-    # the run joins the debate stage through the group's top-centre port
-    for node_id in analysts:
-        src = nodes[node_id]
-        cy = src["y"] + src["h"] / 2
-        edges.append(_edge(node_id, "research", "flow",
-                           f"M {_n(src['x'] + src['w'])} {_n(cy)} "
-                           f"H {_n(spec['spine_x'])} V {_n(spec['bus_y'])} "
-                           f"H {_n(research['x'] + research['w'] / 2)} V {_n(research['y'])}"))
+    # one stage line, as in the wide picture: group to group
+    input_group = groups["input"]
+    edges.append(_edge("input", "research", "flow",
+                       f"M {_n(input_group['x'] + input_group['w'] / 2)} "
+                       f"{_n(input_group['y'] + input_group['h'])} "
+                       f"V {_n(research['y'])}"))
     edges.append(_edge("bull", "bear", "debate", _across(nodes["bull"], nodes["bear"])))
     # the debate's outcome is one thing: both debaters meet a shared merge line
     # and a single drop enters the manager - not two competing elbows
