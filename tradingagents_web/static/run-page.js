@@ -55,6 +55,16 @@
     return node;
   }
 
+  function defs() {
+    var d = element('defs', {});
+    var marker = element('marker', {id: 'ta-arrow', viewBox: '0 0 10 10', refX: 9,
+                                    refY: 5, markerWidth: 6, markerHeight: 6,
+                                    orient: 'auto-start-reverse'});
+    marker.appendChild(element('path', {d: 'M 0 0 L 10 5 L 0 10 z'}));
+    d.appendChild(marker);
+    return d;
+  }
+
   function currentLayout() {
     return window.matchMedia('(min-width: 720px)').matches ? 'wide' : 'narrow';
   }
@@ -65,11 +75,30 @@
     var layout = data[layoutName];
     svg.setAttribute('viewBox', layout.viewBox);
     while (svg.firstChild) svg.removeChild(svg.firstChild);
+    svg.appendChild(defs());
+
+    // Groups sit behind everything: they say which boxes belong together,
+    // they are not stages of their own.
+    (layout.groups || []).forEach(function (group) {
+      var g = element('g', {'class': 'ta-group', 'data-group': group.id});
+      g.appendChild(element('rect', {x: group.x, y: group.y, width: group.w,
+                                     height: group.h, rx: 8}));
+      var label = element('text', {x: group.x + 12, y: group.y + 17});
+      label.textContent = group.label;
+      g.appendChild(label);
+      svg.appendChild(g);
+    });
 
     layout.edges.forEach(function (edge) {
-      svg.appendChild(element('path', {
-        d: edge.d, 'data-from': edge.from, 'data-to': edge.to, 'data-kind': edge.kind
-      }));
+      var attrs = {d: edge.d, 'data-from': edge.from, 'data-to': edge.to,
+                   'data-kind': edge.kind};
+      if (edge.kind === 'debate') {
+        // A debate is two people facing each other, not a hand-off: arrows on
+        // both ends, and never the dashed "transfer" language.
+        attrs['marker-start'] = 'url(#ta-arrow)';
+        attrs['marker-end'] = 'url(#ta-arrow)';
+      }
+      svg.appendChild(element('path', attrs));
     });
 
     groupMembers = {};
