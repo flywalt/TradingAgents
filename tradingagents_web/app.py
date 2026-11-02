@@ -18,6 +18,7 @@ from fastapi.responses import (
     HTMLResponse,
     JSONResponse,
     RedirectResponse,
+    Response,
     StreamingResponse,
 )
 from fastapi.staticfiles import StaticFiles
@@ -32,7 +33,7 @@ from tradingagents_cn.identity import resolve_identity
 from tradingagents_cn.market import CN_A_SHARE, select_profile
 from tradingagents_cn.symbols import try_normalize
 
-from . import db, jobs, security
+from . import db, jobs, labels, progress_graph, report_page, security
 from .errors import QueueFullError, classify
 from .worker import Worker
 
@@ -42,10 +43,7 @@ MAX_QUEUED = 3
 
 #: Display mapping: the report already carries a rating; the UI never renders
 #: it as an order instruction (see spec §9).
-RATING_LABELS = {
-    "Buy": "乐观", "Overweight": "偏乐观", "Hold": "中性",
-    "Underweight": "偏审慎", "Sell": "审慎", "REVIEW": "需人工复核",
-}
+RATING_LABELS = labels.RATING_LABELS
 
 
 def served_report(path: Path) -> tuple[Path, str]:
@@ -103,6 +101,8 @@ def create_app(
     here = Path(__file__).parent
     templates = Jinja2Templates(directory=str(here / "templates"))
     templates.env.filters["rating_label"] = lambda value: RATING_LABELS.get(value, value or "")
+    # Keep Chinese readable in the markup: the graph travels to the page as JSON.
+    templates.env.policies["json.dumps_kwargs"] = {"sort_keys": True, "ensure_ascii": False}
     app.mount("/static", StaticFiles(directory=str(here / "static")), name="static")
 
     background = worker or Worker(path, execute=execute)
@@ -355,6 +355,7 @@ def create_app(
             raise HTTPException(status_code=404, detail="no such run")
         return _render(request, "run.html", run=job,
                        label=RATING_LABELS.get(job.get("rating") or "", ""),
+                       graph=progress_graph.topology(json.loads(job["analysts"])),
                        kviewer=app.state.kviewer_base)
 
     @app.get("/runs/{run_id}/report", dependencies=[Depends(require_read)])
@@ -363,14 +364,21 @@ def create_app(
         if job is None or not job.get("report_path"):
             raise HTTPException(status_code=404, detail="no report yet")
         path = Path(job["report_path"])
-        if not path.is_file():
-            raise HTTPException(status_code=404, detail="report missing on disk")
         served, media_type = served_report(path)
+        # Check the file we are about to send, not the one recorded in the job:
+        # the kernel records complete_report.md but writes the HTML beside it.
+        if not served.is_file():
+            raise HTTPException(status_code=404, detail="report missing on disk")
         headers = {"X-Content-Type-Options": "nosniff"}
-        if media_type == "text/html":
-            headers["Content-Security-Policy"] = (
-                "sandbox; default-src 'none'; style-src 'unsafe-inline'")
-        return FileResponse(served, media_type=media_type, headers=headers)
+        if media_type != "text/html":
+            return FileResponse(served, media_type=media_type, headers=headers)
+        headers["Content-Security-Policy"] = (
+            "sandbox; default-src 'none'; style-src 'unsafe-inline'")
+        # The artifact stays as the kernel wrote it; only the handed-over copy is
+        # translated into the run's language.
+        return Response(content=report_page.present(served.read_text(encoding="utf-8"),
+                                                   job.get("language")),
+                        media_type="text/html", headers=headers)
 
     @app.get("/runs/{run_id}/files/{name}", dependencies=[Depends(require_read)])
     def file(run_id: str, name: str, session=Depends(_conn)):  # noqa: B008

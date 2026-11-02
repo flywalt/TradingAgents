@@ -5,7 +5,8 @@
 {% set status_labels = {'queued': '排队中', 'running': '运行中', 'succeeded': '已完成', 'failed': '失败'} %}
 {% set profile_names = {'CN_A_SHARE': 'A 股', 'UPSTREAM_DEFAULT': '海外默认'} %}
 {% set running = run.status in ('queued', 'running') %}
-<section class="run-record">
+<section class="run-record" data-run-id="{{ run.id }}"
+         data-terminal="{{ (run.status in ('succeeded', 'failed')) | tojson }}">
   <div class="run-record__body">
     <div class="run-record__id">
       <h1 class="run-symbol">{{ run.symbol }}</h1>
@@ -61,6 +62,22 @@
   <p class="fineprint">仅供研究，不构成投资建议。</p>
 </section>
 
+<section class="panel panel--graph" aria-labelledby="graph-title">
+  <div class="panel__head">
+    <h2 id="graph-title">流程</h2>
+    <p class="graph__legend">
+      <span class="graph__key graph__key--run">运行中</span>
+      <span class="graph__key graph__key--done">已完成</span>
+      <span class="graph__key graph__key--flow">交接</span>
+      <span id="graph-rounds" class="graph__rounds"></span>
+    </p>
+  </div>
+  <svg id="progress-graph" class="graph" role="img"
+       aria-label="{{ run.symbol }} 分析流程：分析师、研究、交易、风险、组合五个阶段"
+       data-graph='{{ graph | tojson }}'></svg>
+  <p class="hint">图上只表流程；逐条事件仍在下方“进度”中。</p>
+</section>
+
 <section class="panel panel--trail" aria-labelledby="trail-title">
   <div class="panel__head">
     <h2 id="trail-title">进度</h2>
@@ -71,137 +88,5 @@
 </section>
 {% endblock %}
 {% block script %}
-<script>
-(function () {
-  const runId = {{ run.id | tojson }};
-  const terminal = {{ (run.status in ('succeeded', 'failed')) | tojson }};
-  const el = document.getElementById('timeline');
-  const statusChip = document.getElementById('status');
-  const elapsed = document.getElementById('elapsed');
-  const statusLabels = {queued: '排队中', running: '运行中', succeeded: '已完成', failed: '失败'};
-  const profileLabels = {CN_A_SHARE: 'A 股', UPSTREAM_DEFAULT: '海外默认'};
-  // Display names only: the stored events keep the kernel's node names, so a
-  // renamed node shows through rather than disappearing.
-  const nodeLabels = {
-    'Market Analyst': '市场分析师', 'Sentiment Analyst': '情绪分析师',
-    'News Analyst': '新闻分析师', 'Fundamentals Analyst': '基本面分析师',
-    'Memory Log': '记忆检索', 'Bull Researcher': '多头研究员',
-    'Bear Researcher': '空头研究员', 'Research Manager': '研究经理',
-    'Trader': '交易员', 'Aggressive Analyst': '激进风险分析师',
-    'Conservative Analyst': '保守风险分析师', 'Neutral Analyst': '中性风险分析师',
-    'Portfolio Manager': '组合经理'
-  };
-  const reportLabels = {
-    market_report: '市场', sentiment_report: '情绪', news_report: '新闻',
-    fundamentals_report: '基本面', investment_plan: '研究结论',
-    trader_investment_plan: '交易方案', final_trade_decision: '组合决策'
-  };
-  const startedAt = new Map();
-  let polling = null;
-  let source = null;
-
-  function elapsedSince(startIso, endIso) {
-    const start = Date.parse(startIso);
-    // A finished run is replayed from the log, so measure to the event's own
-    // timestamp rather than to now.
-    const end = endIso ? Date.parse(endIso) : Date.now();
-    if (!startIso || Number.isNaN(start) || Number.isNaN(end)) return '';
-    const seconds = Math.max(0, Math.round((end - start) / 1000));
-    if (seconds < 60) return seconds + ' 秒';
-    return Math.floor(seconds / 60) + ' 分 ' + String(seconds % 60).padStart(2, '0') + ' 秒';
-  }
-
-  function add(text, kind, at) {
-    if (el.firstElementChild && el.firstElementChild.hasAttribute('data-empty')) el.innerHTML = '';
-    const li = document.createElement('li');
-    li.className = 'trail__item' + (kind ? ' trail__item--' + kind : '');
-    const mark = document.createElement('span');
-    mark.className = 'trail__mark';
-    mark.setAttribute('aria-hidden', 'true');
-    const body = document.createElement('span');
-    body.className = 'trail__text';
-    body.textContent = text;
-    li.appendChild(mark);
-    li.appendChild(body);
-    if (at) {
-      const time = document.createElement('time');
-      time.className = 'trail__time mono';
-      time.dateTime = at;
-      time.textContent = at.slice(11, 19);
-      li.appendChild(time);
-    }
-    el.appendChild(li);
-  }
-
-  function tick() {
-    if (!elapsed || !elapsed.dataset.started) return;
-    const start = Date.parse(elapsed.dataset.started);
-    if (Number.isNaN(start)) return;
-    const seconds = Math.max(0, Math.floor((Date.now() - start) / 1000));
-    const mm = String(Math.floor(seconds / 60)).padStart(2, '0');
-    const ss = String(seconds % 60).padStart(2, '0');
-    elapsed.textContent = mm + ':' + ss;
-  }
-
-  function duration() {
-    if (!elapsed || !elapsed.dataset.finished) return;
-    const start = Date.parse(elapsed.dataset.started);
-    const end = Date.parse(elapsed.dataset.finished);
-    if (Number.isNaN(start) || Number.isNaN(end)) return;
-    const seconds = Math.max(0, Math.floor((end - start) / 1000));
-    elapsed.textContent = String(Math.floor(seconds / 60)).padStart(2, '0') + ':' +
-      String(seconds % 60).padStart(2, '0');
-  }
-
-  function handle(data) {
-    if (data.kind === 'run.started') add('开始运行 ' + (profileLabels[data.payload.profile] || data.payload.profile || ''), 'start', data.at);
-    else if (data.kind === 'node.started') {
-      startedAt.set(data.payload.node, data.at);
-      add('开始 ' + (nodeLabels[data.payload.node] || data.payload.node), 'node', data.at);
-    }
-    else if (data.kind === 'node.finished') {
-      const spent = elapsedSince(startedAt.get(data.payload.node), data.at);
-      add('完成 ' + (nodeLabels[data.payload.node] || data.payload.node) + (spent ? ' · ' + spent : ''), 'done', data.at);
-    }
-    else if (data.kind === 'report.ready') add('报告已生成 · ' + (reportLabels[data.payload.key] || data.payload.key), 'report', data.at);
-    else if (data.kind === 'run.finished' || data.kind === 'run.failed') {
-      if (source) source.close();
-      if (!terminal) location.reload();
-    }
-  }
-
-  if (terminal) {
-    duration();
-    source = new EventSource('/api/runs/' + runId + '/events');
-    source.onmessage = function (event) { handle(JSON.parse(event.data)); };
-    source.onerror = function () { source.close(); };
-  } else {
-    setInterval(tick, 1000); tick();
-    source = new EventSource('/api/runs/' + runId + '/events');
-    source.onmessage = function (event) { handle(JSON.parse(event.data)); };
-    source.onerror = function () {
-      source.close();
-      if (polling) return;
-      polling = setInterval(async function () {
-        const res = await fetch('/api/runs/' + runId);
-        if (!res.ok) return;
-        const data = await res.json();
-        statusChip.textContent = statusLabels[data.status] || data.status;
-        if (data.status === 'succeeded' || data.status === 'failed') location.reload();
-      }, 5000);
-    };
-  }
-
-  const rerun = document.getElementById('rerun');
-  if (rerun) rerun.addEventListener('click', async function () {
-    rerun.disabled = true; rerun.textContent = '提交中…';
-    const res = await fetch('/api/runs/' + runId + '/rerun', {
-      method: 'POST', headers: {'X-Requested-With': 'fetch'}
-    });
-    const data = await res.json().catch(() => ({}));
-    if (res.ok) location.href = '/runs/' + data.id;
-    else { rerun.disabled = false; rerun.textContent = '重新运行'; alert((data.error && data.error.message) || '提交失败'); }
-  });
-})();
-</script>
+<script src="/static/run-page.js?v=2" defer></script>
 {% endblock %}

@@ -895,3 +895,106 @@ input[type="checkbox"] {
     scroll-behavior: auto !important;
   }
 }
+
+/* ------------------------------------------------------------- run graph */
+
+.panel--graph { margin-bottom: var(--space-lg); }
+
+.graph {
+  display: block;
+  width: 100%;
+  height: auto;
+  margin: var(--space-sm) 0;
+  overflow: visible;
+}
+
+.graph__legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs) var(--space-sm);
+  align-items: center;
+  margin: 0;
+  font-size: var(--text-xs);
+  color: var(--color-muted);
+}
+
+.graph__key { display: inline-flex; align-items: center; gap: var(--space-2xs); }
+.graph__key::before {
+  content: "";
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  border: 1px solid var(--color-rule-2);
+  background: var(--color-paper-3);
+}
+.graph__key--run::before { border-color: var(--color-accent); background: var(--color-accent-soft); }
+.graph__key--done::before { border-color: var(--color-ink-2); background: var(--color-paper-2); }
+.graph__key--flow::before {
+  border: 0;
+  height: 2px;
+  border-radius: 0;
+  background: repeating-linear-gradient(90deg, var(--color-cool) 0 4px, transparent 4px 8px);
+}
+
+.graph__rounds { color: var(--color-cool); }
+.graph__rounds:empty { display: none; }
+
+.graph .node rect {
+  fill: var(--color-paper-2);
+  stroke: var(--color-rule-2);
+  stroke-width: 1;
+  transition: fill var(--dur-short) var(--ease-out),
+              stroke var(--dur-short) var(--ease-out);
+}
+
+.graph .node text {
+  fill: var(--color-ink-2);
+  font-family: var(--font-body);
+  font-size: 13px;
+  transition: fill var(--dur-short) var(--ease-out);
+}
+
+.graph .node--active rect { fill: var(--color-accent-soft); stroke: var(--color-accent); stroke-width: 1.5; }
+.graph .node--active text { fill: var(--color-ink); }
+.graph .node--done rect { stroke: var(--color-ink-2); }
+.graph .node--done text { fill: var(--color-ink); }
+.graph .node--failed rect { fill: var(--color-bad-soft); stroke: var(--color-bad); stroke-width: 1.5; }
+.graph .node--failed text { fill: var(--color-bad); }
+
+.graph .edge {
+  fill: none;
+  stroke: color-mix(in oklab, var(--color-muted) 62%, var(--color-rule));
+  stroke-width: 1.2;
+  stroke-linecap: round;
+}
+
+.graph .edge--debate { stroke-dasharray: 3 4; }
+.graph .edge--bypass { stroke-dasharray: 2 5; stroke: color-mix(in oklab, var(--color-muted) 60%, transparent); }
+
+.graph .edge.is-flowing {
+  stroke: var(--color-cool);
+  stroke-width: 1.6;
+  stroke-dasharray: 5 5;
+  animation: graph-flow 700ms linear infinite;
+}
+
+.graph .edge.is-debate {
+  stroke: var(--color-cool);
+  stroke-width: 1.4;
+  stroke-dasharray: 4 4;
+  animation: graph-flow 900ms linear infinite;
+}
+
+@keyframes graph-flow { to { stroke-dashoffset: -20; } }
+
+/* Narrow layout sets a smaller type scale for its 78px boxes. */
+@media (max-width: 719px) {
+  .graph .node text { font-size: 12px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .graph .edge.is-flowing,
+  .graph .edge.is-debate { animation: none; }
+  .graph .node rect,
+  .graph .node text { transition: none; }
+}

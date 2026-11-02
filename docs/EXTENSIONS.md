@@ -55,6 +55,10 @@
 | `tradingagents_web/runner.py` | 任务执行序列、节点回调映射、job.json、失败分类 |
 | `tradingagents_web/errors.py` | 异常 → category/message/action |
 | `tradingagents_web/security.py` | 读写 token、CORS、路径白名单 |
+| `tradingagents_web/labels.py` | 中文标签唯一来源：评级/内核节点/分析师映射/报告章节 |
+| `tradingagents_web/report_page.py` | 报告 HTML 的**服务时**本地化（磁盘产物不动） |
+| `tradingagents_web/progress_graph.py` | 运行拓扑与宽/窄两套坐标，边语义 flow/debate/bypass |
+| `tradingagents_web/static/run-page.js` | 运行页脚本：流程图、事件时间线、计时器、重跑（一页一个 script） |
 
 ### 2.4 数据源
 
@@ -110,7 +114,10 @@
 | `tests/downstream/test_web_errors.py` | 错误分类 |
 | `tests/downstream/test_web_security.py` | token 比较、路径白名单 |
 | `tests/downstream/test_web_runner_worker.py` | 执行序列/产物/失败分类/worker 恢复 |
-| `tests/downstream/test_web_api.py` | 鉴权/校验/队列/页面/SSE/文件越权 |
+| `tests/downstream/test_web_api.py` | 鉴权/校验/队列/页面/SSE/文件越权/报告语言/流程图 |
+| `tests/downstream/test_web_labels.py` | 中文标签覆盖全部内核节点与评级枚举 |
+| `tests/downstream/test_web_report_page.py` | 报告本地化 + 上游标记守卫 |
+| `tests/downstream/test_web_progress_graph.py` | 拓扑/两套布局/边语义/未选分析师不画 |
 | `tests/downstream/test_checkpoint_behavior.py` | 版本/口径/脏工作区使 checkpoint 失效 |
 | `tests/downstream/test_run_metadata.py` | 11 项元数据三处渲染 |
 | `tests/downstream/test_snapshot_routing.py` | 快照路由、契约不变、同源一致 |
@@ -213,5 +220,6 @@ git diff --stat upstream/main..HEAD -- tradingagents cli tests pyproject.toml
 | **我们的补丁/方法** | 空结果被标成 `UNAVAILABLE`（`agents/blocks.py`）；SSE 缺 News 节点（`tradingagents_web/runner.py` 的映射）；报告路径取 `.md` 而路由按 HTML 发送；事件并发写 SQLite | 本地修，配测试 |
 | **数据源属性** | RSSHub 只有当前、无历史；Polymarket 只给实时赔率 | 不改代码，写进文档与报告语义 |
 | **上游原始行为** | `stream_run` 不产顶层 task 事件；评级枚举；报告目录默认带时间戳 | 不硬改；用公开 API 或最小补丁，并登记 |
+| **呈现层（只在 Web 内）** | 报告页首中文、流程图的布局与点亮 | 磁盘产物不动；上游改标记由守卫测试先红 |
 
 原则：**能改我们自己的，就不碰上游；能写文档说明的，就不加代码。**
