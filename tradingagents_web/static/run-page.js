@@ -66,7 +66,7 @@
   }
 
   function currentLayout() {
-    return window.matchMedia('(min-width: 720px)').matches ? 'wide' : 'narrow';
+    return window.matchMedia('(min-width: 1000px)').matches ? 'wide' : 'narrow';
   }
 
   function draw() {

@@ -88,7 +88,8 @@ def test_the_debate_pairs_are_marked_as_debates(width):
     assert ("bull", "bear") in pairs
     assert ("risk-aggressive", "risk-conservative") in pairs
     assert ("risk-conservative", "risk-neutral") in pairs
-    assert ("risk-neutral", "risk-aggressive") in pairs
+    assert ("risk-neutral", "risk-aggressive") in pairs if width == "narrow" \
+        else ("risk-aggressive", "risk-neutral") in pairs
 
 
 @pytest.mark.parametrize("width", ["wide", "narrow"])
@@ -106,10 +107,13 @@ def test_the_risk_trio_forms_a_closed_triangle(width):
         if " L " in edge["d"]:                       # diagonal side of the triangle
             x1, y1 = (float(v) for v in parts[1:3])
             x2, y2 = (float(v) for v in parts[4:6])
-        else:                                        # the level top side
+        else:                                        # the level side (H or V)
             x1, y1 = (float(v) for v in parts[1:3])
-            assert parts[3] == "H"
-            x2, y2 = float(parts[4]), y1
+            assert parts[3] in ("H", "V")
+            if parts[3] == "H":
+                x2, y2 = float(parts[4]), y1
+            else:
+                x2, y2 = x1, float(parts[4])
         on_src_edge = (y1 in (src["y"] + src["h"], src["y"] + src["h"] / 2)) and src["x"] <= x1 <= src["x"] + src["w"]
         on_dst_edge = (y2 in (dst["y"], dst["y"] + dst["h"], dst["y"] + dst["h"] / 2)) and dst["x"] <= x2 <= dst["x"] + dst["w"]
         assert on_src_edge and on_dst_edge, (edge, (x1, y1), (x2, y2))
@@ -128,23 +132,38 @@ def test_every_node_carries_its_kernel_name_and_chinese_label():
     ["market", "social", "news"],
     ["market", "social", "news", "fundamentals"],
 ])
-def test_the_analyst_row_is_centred_on_the_debate_entry(analysts):
-    """The fan-in reads as one symmetric gather, whatever the selection."""
+def test_the_analyst_column_sits_on_the_spine(analysts):
+    """The gather reads as one symmetric funnel, whatever the selection."""
     layout = progress_graph.topology(analysts)["wide"]
     boxes = _boxes(layout)
-    research = next(g for g in layout["groups"] if g["id"] == "research")
-    entry = research["x"] + research["w"] / 2
-    centres = [box["x"] + box["w"] / 2 for box in boxes.values()
+    _, _, width_px, height_px = (int(v) for v in layout["viewBox"].split())
+    spine = height_px / 2
+
+    centres = [box["y"] + box["h"] / 2 for box in boxes.values()
                if box["id"].startswith("analyst-")]
+    column_centre = (min(centres) + max(centres)) / 2
+    assert abs(column_centre - spine) <= 1, (analysts, column_centre, spine)
+    assert width_px == 1300                       # one screen wide, not tall
 
-    row_centre = (min(centres) + max(centres)) / 2
-    assert abs(row_centre - entry) <= 1, (analysts, row_centre, entry)
+
+def test_wide_the_debate_stage_speaks_with_one_line():
+    """The stage hands over as one line: the group's edge is the merge."""
+    layout = progress_graph.topology(ALL)["wide"]
+    boxes = _boxes(layout)
+    groups = {g["id"]: g for g in layout["groups"]}
+    manager = boxes["research-manager"]
+    into_manager = [e for e in layout["edges"] if e["to"] == "research-manager"]
+
+    assert [(e["from"], e["kind"]) for e in into_manager] == [("research", "flow")]
+    research = groups["research"]
+    assert into_manager[0]["d"] == (f"M {research['x'] + research['w']} "
+                                    f"{layout['viewBox'].split()[3] and 215} "
+                                    f"H {manager['x']}")
 
 
-@pytest.mark.parametrize("width", ["wide", "narrow"])
-def test_the_debate_merges_into_one_line_before_the_manager(width):
+def test_narrow_the_debate_merges_into_one_line_before_the_manager():
     """Two debaters, one outcome: a shared merge line, a single entry drop."""
-    layout = progress_graph.topology(ALL)[width]
+    layout = progress_graph.topology(ALL)["narrow"]
     boxes = _boxes(layout)
     manager = boxes["research-manager"]
     into_manager = [e for e in layout["edges"] if e["to"] == "research-manager"]

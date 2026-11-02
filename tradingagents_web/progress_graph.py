@@ -54,41 +54,38 @@ _CORE = (
 )
 
 _WIDE = {
-    "viewBox": "0 0 960 770",
+    # Horizontal: the stages hand over left to right, each stage's boxes stack
+    # vertically (the risk trio keeps its triangle). One screen, one line of
+    # travel. Narrow keeps the vertical spine.
+    "viewBox": "0 0 1300 430",
+    "orient": "h",
     "height": 48,
-    "analyst_y": 60,
-    "analyst_width": 150,
-    "analyst_gap": 26,
-    # The analyst row and both group entries share this spine, so the page has
-    # one axis from the input row down to the portfolio.
-    "centre": 480.0,
-    "bus_y": 150.0,
-    "merge_y": 268.0,
-    "default_width": 150,
+    "analyst_x": 20,
+    "analyst_width": 130,
+    "analyst_gap": 16,
+    "spine_y": 215.0,
+    "bus_x": 178.0,
     "boxes": {
-        # the memory log is a feedback node beside the portfolio it feeds,
-        # not part of the input row - in both layouts, telling one story
-        "memory": (720, 692),
-        "bull": (303, 190),
-        "bear": (493, 190),
-        "research-manager": (405, 304),
-        "trader": (405, 392),
-        "risk-aggressive": (240, 498),
-        "risk-conservative": (570, 498),
-        "risk-neutral": (405, 588),
-        "portfolio": (405, 692),
+        "memory": (1150, 300, 140),
+        "bull": (210, 152, 150),
+        "bear": (210, 230, 150),
+        "research-manager": (430, 191, 140),
+        "trader": (620, 191, 140),
+        "risk-aggressive": (800, 120, 120),
+        "risk-conservative": (800, 262, 120),
+        "risk-neutral": (950, 191, 120),
+        "portfolio": (1150, 191, 140),
     },
-    "margin_x": 944.0,
     # Every group opens with a label band before its boxes, so a label never
     # sits on top of a box.
     "groups": [
         {"id": "input", "label": "输入", "members": "analysts",
-         "x": 127, "y": 34, "w": 706, "h": 94},
+         "x": 6, "y": 71, "w": 158, "h": 288},
         {"id": "research", "label": "研究辩论", "members": ["bull", "bear"],
-         "x": 289, "y": 164, "w": 382, "h": 92},
+         "x": 196, "y": 116, "w": 178, "h": 198},
         {"id": "risk", "label": "风险辩论 · 循环", "members":
             ["risk-aggressive", "risk-conservative", "risk-neutral"],
-         "x": 226, "y": 472, "w": 508, "h": 178},
+         "x": 786, "y": 96, "w": 296, "h": 238},
     ],
 }
 
@@ -136,18 +133,19 @@ def _n(value: float) -> str:
 def _analyst_row(spec: dict, analysts: list[str]) -> list[tuple[str, int, int]]:
     """The selected analysts' (key, x, y) triples for this layout.
 
-    Wide centres the row on the spine whatever the selection; narrow stacks a
-    fixed column so its lines can ride one spine.
+    Wide stacks them centred on the horizontal spine whatever the selection;
+    narrow stacks its fixed column the same way. A lone analyst sits on the
+    spine either way.
     """
     selected = [key for key in ANALYST_ORDER if key in analysts]
-    if "analyst_x" in spec:                      # narrow: fixed column, stacked
-        return [(key, spec["analyst_x"], spec["analyst_y"]
-                 + index * (spec["height"] + spec["analyst_gap"]))
+    step = spec["height"] + spec["analyst_gap"]
+    if spec.get("orient") == "h":                # wide: one column on the spine
+        start = round(spec["spine_y"] - (len(selected) * spec["height"]
+                                         + (len(selected) - 1) * spec["analyst_gap"]) / 2)
+        return [(key, spec["analyst_x"], start + index * step)
                 for index, key in enumerate(selected)]
-    width = spec["analyst_width"]
-    total = len(selected) * width + (len(selected) - 1) * spec["analyst_gap"]
-    start = round(spec["centre"] - total / 2)
-    return [(key, start + index * (width + spec["analyst_gap"]), spec["analyst_y"])
+    # narrow: the same fixed column, stacked from the top
+    return [(key, spec["analyst_x"], spec["analyst_y"] + index * step)
             for index, key in enumerate(selected)]
 
 
@@ -165,8 +163,10 @@ def _build_nodes(spec: dict, analysts: list[str]) -> list[dict]:
         nodes.append(_node(f"analyst-{key}", kernel, x, y,
                            spec["analyst_width"], spec["height"]))
     for node_id, kernel in _CORE:
-        x, y = spec["boxes"][node_id]
-        width = spec.get("widths", {}).get(node_id, spec["default_width"])
+        box = spec["boxes"][node_id]
+        x, y = box[0], box[1]
+        width = box[2] if len(box) > 2 else spec.get(
+            "widths", {}).get(node_id, spec["default_width"])
         nodes.append(_node(node_id, kernel, x, y, width, spec["height"]))
     return nodes
 
@@ -237,16 +237,76 @@ def _edge(source: str, target: str, kind: str, path: str) -> dict:
 
 
 def _edges(nodes: dict[str, dict], spec: dict) -> list[dict]:
-    edges = []
     groups = {g["id"]: g for g in spec["groups"]}
+    if spec.get("orient") == "h":
+        return _edges_horizontal(nodes, spec, groups)
+    return _edges_vertical(nodes, spec, groups)
+
+
+def _right_of(group_or_node: dict) -> float:
+    return group_or_node["x"] + group_or_node["w"]
+
+
+def _edges_horizontal(nodes: dict[str, dict], spec: dict, groups: dict) -> list[dict]:
+    """The wide picture: stages hand over left to right along one spine.
+
+    A stage speaks with one voice - its group - so each hand-off is a single
+    line from the group's edge, which is also the debate's merge.
+    """
+    edges = []
+    research, risk = groups["research"], groups["risk"]
+    spine = spec["spine_y"]
+
+    # analysts ride a vertical bus and enter the debate stage once
+    for node_id in (n for n in nodes if n.startswith("analyst-")):
+        src = nodes[node_id]
+        cy = src["y"] + src["h"] / 2
+        edges.append(_edge(node_id, "research", "flow",
+                           f"M {src['x'] + src['w']} {_n(cy)} H {_n(spec['bus_x'])} "
+                           f"V {_n(spine)} H {_n(research['x'])}"))
+    edges.append(_edge("bull", "bear", "debate",
+                       f"M {_n(_centre_x(nodes['bull']))} {_n(nodes['bull']['y'] + nodes['bull']['h'])} "
+                       f"V {_n(nodes['bear']['y'])}"))
+    edges.append(_edge("research", "research-manager", "flow",
+                       f"M {_n(_right_of(research))} {_n(spine)} H {_n(nodes['research-manager']['x'])}"))
+    edges.append(_edge("research-manager", "trader", "flow",
+                       f"M {_n(_right_of(nodes['research-manager']))} {_n(spine)} "
+                       f"H {_n(nodes['trader']['x'])}"))
+    edges.append(_edge("trader", "risk", "flow",
+                       f"M {_n(_right_of(nodes['trader']))} {_n(spine)} H {_n(risk['x'])}"))
+    # the triangle: a level left side, two slopes to the apex
+    edges.append(_edge("risk-aggressive", "risk-conservative", "debate",
+                       f"M {_n(_centre_x(nodes['risk-aggressive']))} "
+                       f"{_n(nodes['risk-aggressive']['y'] + nodes['risk-aggressive']['h'])} "
+                       f"V {_n(nodes['risk-conservative']['y'])}"))
+    edges.append(_edge("risk-aggressive", "risk-neutral", "debate",
+                       _diagonal(nodes["risk-aggressive"], nodes["risk-neutral"], "right", "left")))
+    edges.append(_edge("risk-conservative", "risk-neutral", "debate",
+                       _diagonal(nodes["risk-conservative"], nodes["risk-neutral"], "right", "left")))
+    edges.append(_edge("risk", "portfolio", "flow",
+                       f"M {_n(_right_of(risk))} {_n(spine)} H {_n(nodes['portfolio']['x'])}"))
+    # feedback: straight up into the portfolio's bottom port
+    memory = nodes["memory"]
+    edges.append(_edge("memory", "portfolio", "bypass",
+                       f"M {_n(_centre_x(memory))} {_n(memory['y'])} "
+                       f"V {_n(nodes['portfolio']['y'] + nodes['portfolio']['h'])}"))
+    return edges
+
+
+def _edges_vertical(nodes: dict[str, dict], spec: dict, groups: dict) -> list[dict]:
+    """The narrow picture: one vertical spine, debate pairs side by side."""
+    edges = []
+    research, risk = groups["research"], groups["risk"]
     analysts = [node_id for node_id in nodes if node_id.startswith("analyst-")]
 
     # the run joins the debate stage through the group's top-centre port
-    research = groups["research"]
     for node_id in analysts:
+        src = nodes[node_id]
+        cy = src["y"] + src["h"] / 2
         edges.append(_edge(node_id, "research", "flow",
-                           _enter(nodes[node_id], research["x"] + research["w"] / 2,
-                                  research["y"], spec["bus_y"])))
+                           f"M {_n(src['x'] + src['w'])} {_n(cy)} "
+                           f"H {_n(spec['spine_x'])} V {_n(spec['bus_y'])} "
+                           f"H {_n(research['x'] + research['w'] / 2)} V {_n(research['y'])}"))
     edges.append(_edge("bull", "bear", "debate", _across(nodes["bull"], nodes["bear"])))
     # the debate's outcome is one thing: both debaters meet a shared merge line
     # and a single drop enters the manager - not two competing elbows
@@ -261,23 +321,14 @@ def _edges(nodes: dict[str, dict], spec: dict) -> list[dict]:
                            f"H {_n(entry)} V {_n(manager['y'])}"))
     edges.append(_edge("research-manager", "trader", "flow",
                        _drop(nodes["research-manager"], nodes["trader"])))
-
-    # into the risk loop through its group port as well
-    risk = groups["risk"]
     edges.append(_edge("trader", "risk", "flow",
-                       _enter(nodes["trader"], risk["x"] + risk["w"] / 2,
-                              risk["y"], None)))
-
-    # three equal peers, closed triangle: across the top, then the two slopes
+                       _enter(nodes["trader"], risk["x"] + risk["w"] / 2, risk["y"], None)))
     edges.append(_edge("risk-aggressive", "risk-conservative", "debate",
                        _across(nodes["risk-aggressive"], nodes["risk-conservative"])))
     edges.append(_edge("risk-conservative", "risk-neutral", "debate",
-                       _diagonal(nodes["risk-conservative"], nodes["risk-neutral"],
-                                 "bottom", "right")))
+                       _diagonal(nodes["risk-conservative"], nodes["risk-neutral"], "bottom", "right")))
     edges.append(_edge("risk-neutral", "risk-aggressive", "debate",
-                       _diagonal(nodes["risk-neutral"], nodes["risk-aggressive"],
-                                 "left", "bottom")))
-
+                       _diagonal(nodes["risk-neutral"], nodes["risk-aggressive"], "left", "bottom")))
     edges.append(_edge("risk-neutral", "portfolio", "flow",
                        _drop(nodes["risk-neutral"], nodes["portfolio"])))
     edges.append(_edge("memory", "portfolio", "bypass",

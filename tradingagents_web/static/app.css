@@ -977,8 +977,10 @@ input[type="checkbox"] {
 
 @keyframes graph-flow { to { stroke-dashoffset: -20; } }
 
-/* Narrow layout sets a smaller type scale for its 78px boxes. */
-@media (max-width: 719px) {
+/* Narrow layout sets a smaller type scale for its 78px boxes. The horizontal
+ * stage picture needs a metre of width to stay legible, so below that the
+ * spine takes over. */
+@media (max-width: 999px) {
   .graph .node text { font-size: 12px; }
 }
 
