@@ -24,6 +24,10 @@ SAMPLE = """<!doctype html>
 <span class="label">Analyst Team Reports</span></a></li></ul></nav>
 <main><section id="s1"><h2>I. Analyst Team Reports</h2><h3>Market Analyst</h3>
 <p>正文中的 Generated、Analysts 这些词不该被翻译。</p></section>
+<section id="s5"><h2>V. Portfolio Manager Decision</h2><h3 id="s5-1">Portfolio Manager</h3>
+<p>维持当前配置，重点放在确定性更高的品种上。</p>
+<p>组合在本周没有需要立即执行的调整；风险预算保持不变。</p>
+<p>第三段不应出现在摘要里。</p></section>
 <section id="s6"><h2>Downstream run metadata</h2></section></main>
 <a class="to-top" href="#top">Top</a>
 </body>
@@ -128,3 +132,37 @@ def test_present_is_idempotent():
     once = report_page.present(SAMPLE, "中文")
 
     assert report_page.present(once, "中文") == once
+
+
+def test_the_chinese_report_leads_with_the_decision():
+    out = report_page.present(SAMPLE, "中文")
+
+    assert '<section class="ta-summary"' in out
+    assert out.index('<section class="ta-summary"') < out.index('<nav class="contents"')
+    assert "核心结论" in out
+    assert "维持当前配置，重点放在确定性更高的品种上。" in out
+    assert "组合在本周没有需要立即执行的调整；风险预算保持不变。" in out
+    assert "第三段不应出现在摘要里。" not in out.split('class="ta-summary"')[1].split("</section>")[0]
+    assert 'href="#s5"' in out
+    assert "阅读完整结论" in out
+
+
+def test_the_full_decision_section_survives_the_summary():
+    out = report_page.present(SAMPLE, "中文")
+
+    body = out[out.index('id="s5"'):]
+    for sentence in ("维持当前配置", "组合在本周没有需要立即执行的调整", "第三段不应出现在摘要里"):
+        assert sentence in body
+
+
+def test_a_report_without_a_decision_gets_no_summary_card():
+    html = SAMPLE.replace('<section id="s5"><h2>V. Portfolio Manager Decision</h2>'
+                          '<h3 id="s5-1">Portfolio Manager</h3>'
+                          '<p>维持当前配置，重点放在确定性更高的品种上。</p>'
+                          '<p>组合在本周没有需要立即执行的调整；风险预算保持不变。</p>'
+                          '<p>第三段不应出现在摘要里。</p></section>', "")
+
+    out = report_page.present(html, "中文")
+
+    assert 'class="ta-summary"' not in out   # the stylesheet may still be there
+    assert "核心结论" not in out
