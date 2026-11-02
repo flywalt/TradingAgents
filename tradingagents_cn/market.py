@@ -75,6 +75,7 @@ CN_A_SHARE = MarketProfile(
         "technical_indicators": "tushare,yfinance",
         "fundamental_data": "tushare,yfinance",
         "macro_data": "tushare,fred",
+        "news_data": "xueqiu,yfinance",
     },
     tool_vendors={"get_insider_transactions": "tushare,yfinance"},
     strict_allowed=True,

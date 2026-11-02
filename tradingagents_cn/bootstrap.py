@@ -29,7 +29,7 @@ _VENDOR_NAME_RE = re.compile(r"^[a-z][a-z0-9_]*$")
 #: Vendor modules installed by ``bootstrap()``. A module is expected to expose
 #: ``register_vendors()``; a missing module is skipped, not an error, so a build
 #: without an optional vendor dependency still activates everything else.
-_BUILTIN_MODULES = ("tradingagents_cn.vendors.tushare",)
+_BUILTIN_MODULES = ("tradingagents_cn.vendors.tushare", "tradingagents_cn.vendors.xueqiu")
 
 # (method, vendor) -> implementation we installed
 _REGISTERED: dict[tuple[str, str], object] = {}

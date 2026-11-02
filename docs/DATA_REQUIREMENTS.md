@@ -79,10 +79,11 @@
 | --- | --- |
 | `get_stock_data` / `get_indicators` / 三表 / 概况 / `get_verified_market_snapshot` | ✅ 已接 Tushare 且同源 |
 | `get_insider_transactions` | ✅ `stk_holdertrade`，按公告日过滤 |
-| `get_news` / `get_global_news` | ❌ 待替代（本文 §1/§2 为验收标准） |
+| `get_news` | ✅ 雪球 RSSHub（`stock_info/<CODE>/news`，标题+摘要+发布时间，按窗口过滤） |
+| `get_global_news` | ⚠️ 仍是 Yahoo，内容偏美股科技；需中国相关性源 |
 | `get_macro_indicators` | ✅ 已封装（CN profile：CPI/PPI/GDP/M2/社融/PMI/SHIBOR；LPR/10Y 显式拒绝） |
 | `get_prediction_markets` | ⚠️ 语义不适用，待决定（§4） |
-| 社交情绪 | ❌ 待替代或改语义（§5） |
+| 社交情绪 | ⚠️ 雪球接口就绪（`fetch_stock_comments` / `fetch_stock_items(discuss)` / `fetch_hot_posts`），**尚未接 agent** |
 
 ## 7. B3 前必须先确认的三件事
 

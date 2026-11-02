@@ -83,7 +83,7 @@ def test_apply_lets_the_caller_override_anything():
     assert merged["cn_adjust"] == "hfq"
     assert merged["data_vendors"]["core_stock_apis"] == "yfinance"
     # A partial data_vendors override keeps the other categories.
-    assert merged["data_vendors"]["news_data"] == "yfinance"
+    assert merged["data_vendors"]["news_data"] == "xueqiu,yfinance"
 
 
 def test_apply_can_skip_the_vendor_chain():
@@ -108,8 +108,10 @@ def test_strict_mode_installs_single_vendor_chains():
     assert merged["data_vendors"]["core_stock_apis"] == "tushare"
     assert merged["data_vendors"]["technical_indicators"] == "tushare"
     assert merged["data_vendors"]["fundamental_data"] == "tushare"
-    # Categories downstream does not serve keep upstream's own choice.
-    assert merged["data_vendors"]["news_data"] == "yfinance"
+    # News is served by Xueqiu, so strict narrows it too; a category nobody
+    # downstream serves keeps upstream's own choice.
+    assert merged["data_vendors"]["news_data"] == "xueqiu"
+    assert merged["data_vendors"]["prediction_markets"] == "polymarket"
 
 
 def test_strict_mode_can_come_from_the_environment():
@@ -172,7 +174,7 @@ def test_an_explicit_vendor_choice_wins_in_normal_mode():
     merged = cn_config.apply({"data_vendors": {"core_stock_apis": "yfinance"}})
 
     assert merged["data_vendors"]["core_stock_apis"] == "yfinance"
-    assert merged["data_vendors"]["news_data"] == "yfinance"
+    assert merged["data_vendors"]["news_data"] == "xueqiu,yfinance"
 
 
 # --- strict mode must win over per-tool overrides --------------------------
