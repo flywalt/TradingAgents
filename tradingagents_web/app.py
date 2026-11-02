@@ -32,7 +32,7 @@ from tradingagents_cn.identity import resolve_identity
 from tradingagents_cn.market import CN_A_SHARE, select_profile
 from tradingagents_cn.symbols import try_normalize
 
-from . import db, jobs, security
+from . import db, jobs, labels, security
 from .errors import QueueFullError, classify
 from .worker import Worker
 
@@ -42,10 +42,7 @@ MAX_QUEUED = 3
 
 #: Display mapping: the report already carries a rating; the UI never renders
 #: it as an order instruction (see spec §9).
-RATING_LABELS = {
-    "Buy": "乐观", "Overweight": "偏乐观", "Hold": "中性",
-    "Underweight": "偏审慎", "Sell": "审慎", "REVIEW": "需人工复核",
-}
+RATING_LABELS = labels.RATING_LABELS
 
 
 def served_report(path: Path) -> tuple[Path, str]:
