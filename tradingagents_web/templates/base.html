@@ -3,12 +3,17 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
   <title>{% block title %}TradingAgents{% endblock %}</title>
-  <link rel="stylesheet" href="/static/app.css">
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="/static/app.css?v=2">
 </head>
 <body>
-  <header><a href="/">研究</a><a href="/history">历史</a></header>
+  <header>
+    <a class="brand" href="/">TradingAgents<span>CN</span></a>
+    <nav><a href="/">发起分析</a><a href="/history">历史</a></nav>
+  </header>
   <main>{% block body %}{% endblock %}</main>
-  <script>{% block script %}{% endblock %}</script>
+  {% block script %}{% endblock %}
 </body>
 </html>

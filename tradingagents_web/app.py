@@ -318,7 +318,8 @@ def create_app(
     def index(request: Request, session=Depends(_conn)):  # noqa: B008
         items, _total = jobs.list_runs(session, page=1, size=10)
         return _render(request, "index.html", runs=items, analysts=ANALYSTS,
-                       languages=LANGUAGES, kviewer=app.state.kviewer_base)
+                       languages=LANGUAGES, default_language="中文",
+                       today=date.today().isoformat(), kviewer=app.state.kviewer_base)
 
     @app.get("/history", response_class=HTMLResponse, dependencies=[Depends(require_read)])
     def history(request: Request, symbol: str | None = None, status: str | None = None,

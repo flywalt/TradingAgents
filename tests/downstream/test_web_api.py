@@ -162,3 +162,29 @@ def test_sse_replays_from_last_event_id(client, tmp_path):
     assert "id: 2" in body
     assert "run.failed" in body
     assert "id: 1" not in body        # replay starts after the acknowledged event
+
+
+def test_the_form_defaults_to_today_and_chinese(client):
+    from datetime import date
+
+    page = client.get("/", headers=AUTH)
+
+    assert page.status_code == 200
+    assert f'value="{date.today().isoformat()}"' in page.text
+    assert 'value="中文" selected' in page.text
+    assert "强制只走 Tushare" in page.text      # strict mode explained, not a mystery
+
+
+def test_each_page_has_exactly_one_script_block(client, tmp_path):
+    """Nested <script> tags made the page fall back to a native form post."""
+    assert client.get("/", headers=AUTH).text.count("<script") == 1
+
+    conn = db.connect(tmp_path / "state.db")
+    try:
+        run_id = jobs.create(conn, symbol="600519.SH", market="CN", profile="CN_A_SHARE",
+                             trade_date="2026-10-30", analysts=["market"], language="中文",
+                             strict=False, portfolio_json=None)
+    finally:
+        conn.close()
+
+    assert client.get(f"/runs/{run_id}", headers=AUTH).text.count("<script") == 1

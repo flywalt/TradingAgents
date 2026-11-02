@@ -1,26 +1,38 @@
 {% extends "base.html" %}
 {% block title %}历史{% endblock %}
 {% block body %}
-<h1>历史（{{ total }}）</h1>
-<form method="get">
-  <input name="symbol" placeholder="600519.SH" value="{{ symbol }}">
-  <select name="status"><option value="">状态</option>
-    {% for s in ['queued','running','succeeded','failed'] %}<option value="{{ s }}" {% if status == s %}selected{% endif %}>{{ s }}</option>{% endfor %}
-  </select>
-  <input name="rating" placeholder="评级" value="{{ rating }}">
-  <button>筛选</button>
-</form>
-<table>
-  <thead><tr><th>时间</th><th>标的</th><th>日期</th><th>状态</th><th>评级</th></tr></thead>
-  <tbody>
-  {% for r in runs %}
-    <tr><td>{{ r.created_at }}</td><td><a href="/runs/{{ r.id }}">{{ r.symbol }}</a></td>
-        <td>{{ r.trade_date }}</td><td>{{ r.status }}</td><td>{{ r.rating or "" | rating_label }}</td></tr>
-  {% endfor %}
-  </tbody>
-</table>
-<p>
-  {% if page > 1 %}<a href="?page={{ page - 1 }}&symbol={{ symbol }}&status={{ status }}&rating={{ rating }}">上一页</a>{% endif %}
-  {% if page * 20 < total %}<a href="?page={{ page + 1 }}&symbol={{ symbol }}&status={{ status }}&rating={{ rating }}">下一页</a>{% endif %}
-</p>
+<section class="card">
+  <h1>历史（{{ total }}）</h1>
+  <form method="get" class="filters">
+    <input name="symbol" placeholder="600519.SH" value="{{ symbol }}">
+    <select name="status">
+      <option value="">全部状态</option>
+      {% for s in ['queued','running','succeeded','failed'] %}
+        <option value="{{ s }}" {% if status == s %}selected{% endif %}>{{ s }}</option>
+      {% endfor %}
+    </select>
+    <input name="rating" placeholder="评级" value="{{ rating }}">
+    <button type="submit">筛选</button>
+  </form>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>时间</th><th>标的</th><th>日期</th><th>状态</th><th>评级</th></tr></thead>
+      <tbody>
+      {% for r in runs %}
+        <tr><td class="muted">{{ r.created_at[5:16].replace('T', ' ') }}</td>
+            <td><a href="/runs/{{ r.id }}">{{ r.symbol }}</a></td>
+            <td class="muted">{{ r.trade_date }}</td>
+            <td><span class="chip {{ r.status }}">{{ r.status }}</span></td>
+            <td>{{ (r.rating or "") | rating_label }}</td></tr>
+      {% else %}
+        <tr><td colspan="5" class="muted">没有匹配的记录</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <div class="pager">
+    {% if page > 1 %}<a class="button ghost" href="?page={{ page - 1 }}&symbol={{ symbol }}&status={{ status }}&rating={{ rating }}">上一页</a>{% endif %}
+    {% if page * 20 < total %}<a class="button ghost" href="?page={{ page + 1 }}&symbol={{ symbol }}&status={{ status }}&rating={{ rating }}">下一页</a>{% endif %}
+  </div>
+</section>
 {% endblock %}
