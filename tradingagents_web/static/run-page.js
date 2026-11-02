@@ -34,6 +34,7 @@
    * the words live in one place (labels.py) instead of in this file. */
   var nodeLabels = {};
   var toGraphId = {};
+  var groupMembers = {};   // group id -> member node ids (entries end on groups)
   ['wide', 'narrow'].forEach(function (name) {
     if (!data) return;
     data[name].nodes.forEach(function (node) {
@@ -71,6 +72,11 @@
       }));
     });
 
+    groupMembers = {};
+    (layout.groups || []).forEach(function (group) {
+      groupMembers[group.id] = group.members;
+    });
+
     layout.nodes.forEach(function (node) {
       var group = element('g', {
         'data-node': node.id, transform: 'translate(' + node.x + ',' + node.y + ')'
@@ -84,14 +90,25 @@
     paint();
   }
 
+  /* An edge may end on a group container: the run joins the debate stage, not
+   * one debater. A group is active while any member works, done when all have. */
+  function stateOf(id) {
+    if (state.nodes[id]) return state.nodes[id];
+    var members = groupMembers[id];
+    if (!members) return 'idle';
+    if (members.some(function (m) { return state.nodes[m] === 'active'; })) return 'active';
+    if (members.every(function (m) { return state.nodes[m] === 'done'; })) return 'done';
+    return 'idle';
+  }
+
   function paint() {
     if (!svg) return;
     Array.prototype.forEach.call(svg.querySelectorAll('[data-node]'), function (group) {
       group.setAttribute('class', 'node node--' + (state.nodes[group.dataset.node] || 'idle'));
     });
     Array.prototype.forEach.call(svg.querySelectorAll('[data-kind]'), function (path) {
-      var from = state.nodes[path.dataset.from] || 'idle';
-      var to = state.nodes[path.dataset.to] || 'idle';
+      var from = stateOf(path.dataset.from);
+      var to = stateOf(path.dataset.to);
       var classes = ['edge', 'edge--' + path.dataset.kind];
       // A hand-off is live while the next node works and the previous one is done.
       if (to === 'active' && from === 'done') classes.push('is-flowing');

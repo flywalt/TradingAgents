@@ -21,6 +21,13 @@ def _boxes(layout):
     return {n["id"]: n for n in layout["nodes"]}
 
 
+def _target_ok(target, layout):
+    """Edges may end on a node or on a group container's port."""
+    if target in _boxes(layout):
+        return True
+    return target in {g["id"] for g in layout["groups"]}
+
+
 @pytest.mark.parametrize("width", ["wide", "narrow"])
 def test_the_layout_draws_every_core_node(width):
     ids = set(_boxes(progress_graph.topology(ALL)[width]))
@@ -37,7 +44,8 @@ def test_only_the_selected_analysts_are_drawn(width):
 
     assert "analyst-market" in ids
     assert not {"analyst-social", "analyst-news", "analyst-fundamentals"} & ids
-    assert all(e["from"] in ids and e["to"] in ids for e in layout["edges"])
+    assert all(_target_ok(e["from"], layout) and _target_ok(e["to"], layout)
+               for e in layout["edges"])
 
 
 @pytest.mark.parametrize("width", ["wide", "narrow"])
@@ -65,10 +73,9 @@ def test_every_node_fits_inside_the_viewbox(width):
 @pytest.mark.parametrize("width", ["wide", "narrow"])
 def test_every_edge_is_a_path_between_two_known_nodes(width):
     layout = progress_graph.topology(ALL)[width]
-    ids = set(_boxes(layout))
 
     for edge in layout["edges"]:
-        assert edge["from"] in ids and edge["to"] in ids
+        assert _target_ok(edge["from"], layout) and _target_ok(edge["to"], layout)
         assert edge["d"].startswith("M ")
         assert edge["kind"] in {"flow", "debate", "bypass"}
 
@@ -82,6 +89,30 @@ def test_the_debate_pairs_are_marked_as_debates(width):
     assert ("risk-aggressive", "risk-conservative") in pairs
     assert ("risk-conservative", "risk-neutral") in pairs
     assert ("risk-neutral", "risk-aggressive") in pairs
+
+
+@pytest.mark.parametrize("width", ["wide", "narrow"])
+def test_the_risk_trio_forms_a_closed_triangle(width):
+    """Equal peers in a loop: drawn as a triangle, every corner on a box edge."""
+    layout = progress_graph.topology(ALL)[width]
+    boxes = _boxes(layout)
+    trio = [e for e in layout["edges"] if e["kind"] == "debate"
+            and e["from"].startswith("risk-")]
+    assert len(trio) == 3
+
+    for edge in trio:
+        src, dst = boxes[edge["from"]], boxes[edge["to"]]
+        parts = edge["d"].split(" ")
+        if " L " in edge["d"]:                       # diagonal side of the triangle
+            x1, y1 = (float(v) for v in parts[1:3])
+            x2, y2 = (float(v) for v in parts[4:6])
+        else:                                        # the level top side
+            x1, y1 = (float(v) for v in parts[1:3])
+            assert parts[3] == "H"
+            x2, y2 = float(parts[4]), y1
+        on_src_edge = (y1 in (src["y"] + src["h"], src["y"] + src["h"] / 2)) and src["x"] <= x1 <= src["x"] + src["w"]
+        on_dst_edge = (y2 in (dst["y"], dst["y"] + dst["h"], dst["y"] + dst["h"] / 2)) and dst["x"] <= x2 <= dst["x"] + dst["w"]
+        assert on_src_edge and on_dst_edge, (edge, (x1, y1), (x2, y2))
 
 
 def test_every_node_carries_its_kernel_name_and_chinese_label():
@@ -99,10 +130,12 @@ def test_every_node_carries_its_kernel_name_and_chinese_label():
 ])
 def test_the_analyst_row_is_centred_on_the_debate_entry(analysts):
     """The fan-in reads as one symmetric gather, whatever the selection."""
-    boxes = _boxes(progress_graph.topology(analysts)["wide"])
-    bull_centre = boxes["bull"]["x"] + boxes["bull"]["w"] / 2
+    layout = progress_graph.topology(analysts)["wide"]
+    boxes = _boxes(layout)
+    research = next(g for g in layout["groups"] if g["id"] == "research")
+    entry = research["x"] + research["w"] / 2
     centres = [box["x"] + box["w"] / 2 for box in boxes.values()
                if box["id"].startswith("analyst-")]
 
     row_centre = (min(centres) + max(centres)) / 2
-    assert abs(row_centre - bull_centre) <= 1, (analysts, row_centre, bull_centre)
+    assert abs(row_centre - entry) <= 1, (analysts, row_centre, entry)
