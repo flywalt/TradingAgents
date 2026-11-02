@@ -283,3 +283,23 @@ def test_an_english_report_is_served_as_written(client, tmp_path):
 
     assert '<html lang="en">' in response.text
     assert response.text.count("回到顶部") == 0
+
+
+def test_the_run_page_draws_the_graph_for_the_selected_analysts(client, tmp_path):
+    conn = db.connect(tmp_path / "state.db")
+    try:
+        run_id = jobs.create(conn, symbol="600519.SH", market="CN", profile="CN_A_SHARE",
+                             trade_date="2026-10-30", analysts=["market"], language="中文",
+                             strict=False, portfolio_json=None)
+    finally:
+        conn.close()
+
+    page = client.get(f"/runs/{run_id}", headers=AUTH)
+
+    assert page.status_code == 200
+    assert "panel panel--graph" in page.text
+    assert 'role="img"' in page.text
+    assert "多头研究员" in page.text            # a label that reaches the page from Python
+    assert "情绪分析师" not in page.text         # that analyst was not selected
+    assert page.text.count("<script") == 1
+    assert "/static/run-page.js" in page.text

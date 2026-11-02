@@ -33,7 +33,7 @@ from tradingagents_cn.identity import resolve_identity
 from tradingagents_cn.market import CN_A_SHARE, select_profile
 from tradingagents_cn.symbols import try_normalize
 
-from . import db, jobs, labels, report_page, security
+from . import db, jobs, labels, progress_graph, report_page, security
 from .errors import QueueFullError, classify
 from .worker import Worker
 
@@ -101,6 +101,8 @@ def create_app(
     here = Path(__file__).parent
     templates = Jinja2Templates(directory=str(here / "templates"))
     templates.env.filters["rating_label"] = lambda value: RATING_LABELS.get(value, value or "")
+    # Keep Chinese readable in the markup: the graph travels to the page as JSON.
+    templates.env.policies["json.dumps_kwargs"] = {"sort_keys": True, "ensure_ascii": False}
     app.mount("/static", StaticFiles(directory=str(here / "static")), name="static")
 
     background = worker or Worker(path, execute=execute)
@@ -353,6 +355,7 @@ def create_app(
             raise HTTPException(status_code=404, detail="no such run")
         return _render(request, "run.html", run=job,
                        label=RATING_LABELS.get(job.get("rating") or "", ""),
+                       graph=progress_graph.topology(json.loads(job["analysts"])),
                        kviewer=app.state.kviewer_base)
 
     @app.get("/runs/{run_id}/report", dependencies=[Depends(require_read)])
