@@ -357,3 +357,25 @@ def test_the_form_search_endpoint_answers_suggestions(client, monkeypatch):
 
 def test_the_form_search_requires_a_token(client):
     assert client.get("/api/search", params={"q": "x"}).status_code == 401
+
+
+def test_a_browser_gets_a_login_page_not_raw_json(client):
+    page = client.get("/", headers={"Accept": "text/html"})
+
+    assert page.status_code == 401
+    assert page.headers["content-type"].startswith("text/html")
+    assert 'action="/login"' in page.text      # a form a person can use
+
+
+def test_an_api_client_still_gets_json(client):
+    denied = client.get("/api/runs")
+
+    assert denied.status_code == 401
+    assert denied.headers["content-type"].startswith("application/json")
+
+
+def test_the_login_cookie_survives_a_browser_restart(client):
+    response = client.get("/login", params={"token": TOKEN}, follow_redirects=False)
+
+    cookie = response.headers.get("set-cookie", "")
+    assert "Max-Age=2592000" in cookie          # thirty days, not a session
