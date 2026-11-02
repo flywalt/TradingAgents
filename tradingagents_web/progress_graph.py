@@ -44,7 +44,9 @@ _WIDE = {
     "height": 48,
     "analyst_y": 48,
     "analyst_width": 150,
-    "analyst_x": {"market": 40, "social": 216, "news": 392, "fundamentals": 568},
+    # No fixed analyst_x: the row is computed per selection (see _analyst_row)
+    # so its centre always sits on the debate entry, whatever is selected.
+    "analyst_gap": 26,
     "default_width": 150,
     "boxes": {
         "memory": (760, 48),
@@ -90,17 +92,37 @@ def _n(value: float) -> str:
     return f"{value:g}"
 
 
+def _analyst_row(spec: dict, analysts: list[str]) -> list[tuple[str, int]]:
+    """The selected analysts' (key, x) pairs, centred on bull in the wide layout.
+
+    A fixed row would sit lopsided over the debate entry whenever fewer than
+    all four analysts are selected — and even with all four, the gather reads
+    symmetric only if the row's centre meets the node it feeds.
+    """
+    selected = [key for key in ANALYST_ORDER if key in analysts]
+    if "analyst_x" in spec:                      # narrow keeps its fixed row
+        return [(key, spec["analyst_x"][key]) for key in selected]
+    width = spec["analyst_width"]
+    total = len(selected) * width + (len(selected) - 1) * spec["analyst_gap"]
+    bull = spec["boxes"]["bull"]
+    centre = bull[0] + spec["default_width"] / 2
+    start = round(centre - total / 2)
+    return [(key, start + index * (width + spec["analyst_gap"]))
+            for index, key in enumerate(selected)]
+
+
 def _build_nodes(spec: dict, analysts: list[str]) -> list[dict]:
     nodes = []
-    for key in ANALYST_ORDER:
-        if key not in analysts:
-            continue
+    for key, x in _analyst_row(spec, analysts):
         kernel = ANALYST_NODES[key]
-        x = spec["analyst_x"][key]
         nodes.append(_node(f"analyst-{key}", kernel, x, spec["analyst_y"],
                            spec["analyst_width"], spec["height"]))
+    analyst_end = nodes[-1]["x"] + nodes[-1]["w"] if nodes else 0
     for node_id, kernel in _CORE:
         x, y = spec["boxes"][node_id]
+        if node_id == "memory" and "analyst_x" not in spec and nodes:
+            # right after the analyst row, one gap out
+            x = analyst_end + spec["analyst_gap"]
         width = spec.get("widths", {}).get(node_id, spec["default_width"])
         nodes.append(_node(node_id, kernel, x, y, width, spec["height"]))
     return nodes

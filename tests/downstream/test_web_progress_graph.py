@@ -89,3 +89,20 @@ def test_every_node_carries_its_kernel_name_and_chinese_label():
 
     assert bull["kernel"] == "Bull Researcher"
     assert bull["label"] == "多头研究员"
+
+
+@pytest.mark.parametrize("analysts", [
+    ["market"],
+    ["market", "social"],
+    ["market", "social", "news"],
+    ["market", "social", "news", "fundamentals"],
+])
+def test_the_analyst_row_is_centred_on_the_debate_entry(analysts):
+    """The fan-in reads as one symmetric gather, whatever the selection."""
+    boxes = _boxes(progress_graph.topology(analysts)["wide"])
+    bull_centre = boxes["bull"]["x"] + boxes["bull"]["w"] / 2
+    centres = [box["x"] + box["w"] / 2 for box in boxes.values()
+               if box["id"].startswith("analyst-")]
+
+    row_centre = (min(centres) + max(centres)) / 2
+    assert abs(row_centre - bull_centre) <= 1, (analysts, row_centre, bull_centre)
