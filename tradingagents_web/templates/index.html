@@ -17,8 +17,9 @@
     <form id="run-form" autocomplete="off">
       <div class="field">
         <label for="symbol">标的</label>
-        <input class="input input--code" name="symbol" id="symbol" placeholder="600519.SH" required inputmode="text" spellcheck="false">
-        <small id="preview" class="hint">输入代码后失焦可预览规范代码与市场</small>
+        <input class="input input--code" name="symbol" id="symbol" placeholder="600519 / 茅台" required inputmode="text" spellcheck="false" autocomplete="off">
+        <div id="suggest" class="suggest" hidden></div>
+        <small id="preview" class="hint">支持模糊搜索：代码或名称片段，如 6005 / 茅台</small>
       </div>
       <div class="field-row">
         <div class="field">
@@ -70,7 +71,7 @@
         {% for r in runs %}
           <tr>
             <td class="mono muted" data-label="时间">{{ r.created_at[5:16].replace('T', ' ') }}</td>
-            <td data-label="标的"><a class="sym" href="/runs/{{ r.id }}">{{ r.symbol }}{% if r.display_name %}<small class="sym__name">{{ r.display_name }}</small>{% endif %}</a></td>
+            <td data-label="标的"><a class="sym" href="/runs/{{ r.id }}" title="{{ r.symbol }}">{{ r.display_name or r.symbol }}</a></td>
             <td data-label="状态"><span class="chip {{ r.status }}">{{ status_labels.get(r.status, r.status) }}</span></td>
             <td data-label="评级">{{ (r.rating or "") | rating_label }}</td>
           </tr>
@@ -93,6 +94,71 @@
   const note = document.getElementById('form-note');
   const button = document.getElementById('submit');
   const profileLabels = {CN_A_SHARE: 'A 股', UPSTREAM_DEFAULT: '海外默认'};
+
+  const suggestBox = document.getElementById('suggest');
+  let suggestTimer = null;
+  let suggestSeq = 0;
+
+  async function runPreview() {
+    if (!symbolInput.value.trim()) return;
+    try {
+      const res = await fetch('/api/preview?symbol=' + encodeURIComponent(symbolInput.value));
+      const data = await res.json();
+      if (res.ok) {
+        preview.textContent = data.symbol + '，' + (profileLabels[data.profile] || data.profile) + (data.name ? '，' + data.name : '');
+        preview.className = 'hint ok';
+      } else {
+        preview.textContent = (data.error && data.error.message) || '无法预览';
+        preview.className = 'hint error';
+      }
+    } catch (err) {
+      preview.textContent = '预览失败（网络）';
+      preview.className = 'hint error';
+    }
+  }
+
+  function closeSuggest() { suggestBox.hidden = true; }
+
+  symbolInput.addEventListener('input', () => {
+    clearTimeout(suggestTimer);
+    const query = symbolInput.value.trim();
+    if (query.length < 1) { closeSuggest(); return; }
+    suggestTimer = setTimeout(async () => {
+      const seq = ++suggestSeq;
+      try {
+        const res = await fetch('/api/search?q=' + encodeURIComponent(query));
+        const data = await res.json();
+        if (seq !== suggestSeq || !res.ok) return;
+        const results = data.results || [];
+        if (!results.length) { closeSuggest(); return; }
+        suggestBox.innerHTML = '';
+        results.forEach(item => {
+          const button = document.createElement('button');
+          button.type = 'button';
+          button.className = 'suggest__item';
+          button.innerHTML = '<span class="suggest__code">' + item.symbol +
+            '</span><span class="suggest__name">' + item.name + '</span>';
+          button.addEventListener('mousedown', event => {
+            event.preventDefault();           // keep the field's focus
+            symbolInput.value = item.symbol;
+            closeSuggest();
+            runPreview();
+          });
+          suggestBox.appendChild(button);
+        });
+        suggestBox.hidden = false;
+      } catch (err) { closeSuggest(); }
+    }, 160);
+  });
+  symbolInput.addEventListener('keydown', event => {
+    if (event.key === 'Escape') closeSuggest();
+    if (event.key === 'Enter' && !suggestBox.hidden) {
+      event.preventDefault();
+      const first = suggestBox.querySelector('button');
+      if (first) first.dispatchEvent(new MouseEvent('mousedown'));
+    }
+  });
+  symbolInput.addEventListener('blur', () => setTimeout(closeSuggest, 120));
 
   symbolInput.addEventListener('blur', async () => {
     if (!symbolInput.value.trim()) return;

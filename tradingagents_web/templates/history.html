@@ -43,7 +43,7 @@
     {% for r in runs %}
       <tr>
         <td class="mono muted" data-label="时间">{{ r.created_at[5:16].replace('T', ' ') }}</td>
-        <td data-label="标的"><a class="sym" href="/runs/{{ r.id }}">{{ r.symbol }}{% if r.display_name %}<small class="sym__name">{{ r.display_name }}</small>{% endif %}</a></td>
+        <td data-label="标的"><a class="sym" href="/runs/{{ r.id }}" title="{{ r.symbol }}">{{ r.display_name or r.symbol }}</a></td>
         <td class="mono muted" data-label="日期">{{ r.trade_date }}</td>
         <td data-label="状态"><span class="chip {{ r.status }}">{{ status_labels.get(r.status, r.status) }}</span></td>
         <td data-label="评级">{{ (r.rating or "") | rating_label }}</td>

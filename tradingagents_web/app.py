@@ -33,7 +33,7 @@ from tradingagents_cn.identity import resolve_identity
 from tradingagents_cn.market import CN_A_SHARE, select_profile
 from tradingagents_cn.symbols import try_normalize
 
-from . import db, jobs, labels, progress_graph, report_page, security
+from . import db, jobs, labels, progress_graph, report_page, search, security
 from .errors import QueueFullError, classify
 from .worker import Worker
 
@@ -253,6 +253,11 @@ def create_app(
         )
         background.submit(run_id)
         return {"id": run_id, "position": jobs.queue_position(session, run_id)}
+
+    @app.get("/api/search", dependencies=[Depends(require_read)])
+    def search_instruments(q: str = ""):
+        """Suggestions for the run form: a code or name fragment."""
+        return {"results": search.suggest(q)}
 
     @app.get("/api/runs", dependencies=[Depends(require_read)])
     def list_runs(symbol: str | None = None, status: str | None = None,

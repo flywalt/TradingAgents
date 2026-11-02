@@ -341,3 +341,19 @@ def test_the_report_leads_with_the_company_name(client, tmp_path):
     page = client.get(f"/runs/{run_id}/report", headers=AUTH)
 
     assert "贵州茅台 · 600519.SH" in page.text
+
+
+def test_the_form_search_endpoint_answers_suggestions(client, monkeypatch):
+    import tradingagents_web.app as web_app
+
+    monkeypatch.setattr(web_app.search, "suggest",
+                        lambda q: [{"symbol": "600519.SH", "name": "贵州茅台"}])
+    response = client.get("/api/search", params={"q": "茅台"}, headers=AUTH)
+
+    assert response.status_code == 200
+    assert response.json() == {"results": [{"symbol": "600519.SH",
+                                            "name": "贵州茅台"}]}
+
+
+def test_the_form_search_requires_a_token(client):
+    assert client.get("/api/search", params={"q": "x"}).status_code == 401
