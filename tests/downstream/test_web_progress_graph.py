@@ -239,8 +239,8 @@ def test_every_stage_sits_the_same_distance_from_its_neighbour(width):
         return group["x"] + group["w"] if horizontal else group["y"] + group["h"]
 
     chain = ["input", "research", "research-manager", "trader", "risk", "portfolio"]
-    gaps = [round(edge_of(b) - far_edge(a))
-            for a, b in zip(chain, chain[1:], strict=True)]
+    gaps = [round(edge_of(chain[i + 1]) - far_edge(chain[i]))
+            for i in range(len(chain) - 1)]
     assert gaps == [48] * 5 if horizontal else gaps == [24] * 5
 
 
