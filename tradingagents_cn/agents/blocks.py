@@ -8,8 +8,14 @@ MAX_ITEMS = 20
 
 
 def block(items: list[dict], limit: int = MAX_ITEMS) -> str:
+    """Render items; distinguish "answered with nothing" from "could not answer".
+
+    The upstream data layer already separates NO_DATA from DATA_UNAVAILABLE, and
+    the analyst should preserve that distinction: a quiet company is not a broken
+    feed.
+    """
     if not items:
-        return "UNAVAILABLE: this source returned no items in the window."
+        return "NO_ITEMS: this source answered but had nothing in the window."
     lines = []
     for item in items[:limit]:
         stamp = item["published"].isoformat() if item.get("published") else "no-date"

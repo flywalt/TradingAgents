@@ -87,3 +87,11 @@ def test_the_cn_graph_uses_the_downstream_news_factory(monkeypatch, tmp_path):
     build_graph(settings, symbol="600519.SH")
 
     assert calls, "the CN graph did not use the downstream news factory"
+
+
+def test_an_empty_source_is_reported_as_no_items_not_unavailable():
+    from tradingagents_cn.agents import blocks
+
+    assert blocks.block([]).startswith("NO_ITEMS")
+    rendered = blocks.safe("source", lambda: [])
+    assert rendered.startswith("NO_ITEMS")

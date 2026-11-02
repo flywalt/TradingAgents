@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from pathlib import Path
 
 from langchain_core.callbacks import BaseCallbackHandler
@@ -37,6 +38,10 @@ _REPORT_KEYS = (
 )
 
 
+def _normalise(text) -> str:
+    return re.sub(r"[^a-z0-9]+", "_", str(text).lower()).strip("_")
+
+
 class Progress(BaseCallbackHandler):
     """Maps LangGraph node callbacks to web events; ignores model/tool nodes."""
 
@@ -49,9 +54,12 @@ class Progress(BaseCallbackHandler):
         name = metadata.get("langgraph_node")
         if name in NODE_NAMES:
             return name
-        namespace = str(metadata.get("langgraph_checkpoint_ns", ""))
+        # Inside an analyst's subgraph the node is "agent"/"tools"; the parent is
+        # only visible in the checkpoint namespace, whose punctuation varies
+        # ("News Analyst:abc", "news_analyst:abc").
+        namespace = _normalise(metadata.get("langgraph_checkpoint_ns", ""))
         for node in NODE_NAMES:
-            if namespace.startswith(node.lower().replace(" ", "_")):
+            if namespace.startswith(_normalise(node)):
                 return node
         return None
 

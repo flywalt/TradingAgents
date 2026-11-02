@@ -97,6 +97,7 @@
 | D-0047 | 本条提交 `feat(cls)` | feat | RSSHub 公共层抽取 + 财联社电报（全市场雷达/公司事件流，按代码提取聚合） | 无 | 无 | 7 项离线 + 2 项 live |
 | D-0048 | 本条提交 `feat(agent)` | feat | A 股情绪分析师（雪球评论/帖子/热帖）替换上游美股源；CN 图经 `graph/wiring.py` 重建 | 无 | 无 | 3 项新增，全量 1766 passed |
 | D-0049 | 本条提交 `feat(agent)` | feat | 下游新闻分析师：上游四工具 + 预取 CLS 公司事件/雪球公告；CN 图同时替换 news 与 sentiment | 无 | 无 | 3 项新增，全量 1769 passed |
+| D-0050 | 本条提交 `fix(agents)` | fix | 空结果标记 `NO_ITEMS`（本地语义）；SSE 子图 namespace 映射修复（Web 本地）；RSS 无历史写入文档 | 无 | 无 | 新增 3 项测试，全量 1772 passed |
 
 十余条下游提交合计新增代码与文档，**0 行上游改动**。下游与上游的唯一耦合是文档里登记的"脆弱耦合"，
 现在由 `tests/downstream/test_sync_guard.py`（12 组断言）机械锁定。

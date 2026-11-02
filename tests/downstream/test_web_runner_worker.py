@@ -156,3 +156,28 @@ def test_the_run_honours_the_selected_analysts(conn, tmp_path):
     runner.execute(conn, run_id, build_graph=build)
 
     assert seen["selected_analysts"] == ("market",)
+
+
+def test_progress_maps_subgraph_namespaces_to_their_analyst():
+    from tradingagents_web.runner import Progress
+
+    events = []
+    progress = Progress(lambda kind, payload: events.append((kind, payload)))
+
+    progress.on_chain_start(None, None, metadata={"langgraph_node": "agent",
+                                                  "langgraph_checkpoint_ns": "news_analyst:abc"})
+    progress.on_chain_end(None, metadata={"langgraph_node": "agent",
+                                          "langgraph_checkpoint_ns": "News Analyst:abc"})
+
+    assert events == [("node.started", {"node": "News Analyst"}),
+                      ("node.finished", {"node": "News Analyst"})]
+
+
+def test_progress_ignores_model_and_tool_nodes():
+    from tradingagents_web.runner import Progress
+
+    events = []
+    progress = Progress(lambda kind, payload: events.append((kind, payload)))
+    progress.on_chain_start(None, None, metadata={"langgraph_node": "model"})
+
+    assert events == []
