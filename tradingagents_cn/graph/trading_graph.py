@@ -51,6 +51,16 @@ class CnTradingAgentsGraph(TradingAgentsGraph):
             config=config,
             callbacks=callbacks,
         )
+        if (
+            self.config.get("cn_market_profile") == "CN_A_SHARE"
+            and self.config.get("cn_downstream_analysts", True)
+        ):
+            from tradingagents_cn.graph.wiring import build_cn_workflow
+
+            self.workflow = build_cn_workflow(
+                self, tuple(selected_analysts), self._memory_step
+            )
+            self.graph = self.workflow.compile()
 
     def resolve_instrument_context(
         self, ticker: str, asset_type: str = "stock", trade_date: str | None = None

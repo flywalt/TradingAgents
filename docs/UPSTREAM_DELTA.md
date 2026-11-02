@@ -95,6 +95,7 @@
 | D-0045 | 本条提交 `feat(web)` | feat | Web 外壳 W1：FastAPI + SQLite + 单 worker + SSE + 报告/文件服务 + kviewer 钩子；测试 37 个新增 | 无 | 无 | 全量 1744 passed |
 | D-0046 | 本条提交 `feat(xueqiu)` | feat | 雪球 RSSHub：个股新闻接 `get_news`（CN 链 `xueqiu,yfinance`）、帖子/评论/热帖接口；`?key=` 鉴权、窗口过滤、HTML 清洗 | 无 | 无 | 10 项离线 + 2 项 live |
 | D-0047 | 本条提交 `feat(cls)` | feat | RSSHub 公共层抽取 + 财联社电报（全市场雷达/公司事件流，按代码提取聚合） | 无 | 无 | 7 项离线 + 2 项 live |
+| D-0048 | 本条提交 `feat(agent)` | feat | A 股情绪分析师（雪球评论/帖子/热帖）替换上游美股源；CN 图经 `graph/wiring.py` 重建 | 无 | 无 | 3 项新增，全量 1766 passed |
 
 十余条下游提交合计新增代码与文档，**0 行上游改动**。下游与上游的唯一耦合是文档里登记的"脆弱耦合"，
 现在由 `tests/downstream/test_sync_guard.py`（12 组断言）机械锁定。
@@ -138,6 +139,7 @@
 | `dataflows/errors.py` 错误类型语义 | `dataflows/errors.py` | router 靠类型决定"换下一家/放弃" | fallback 失效或异常冒到模型 | 测试：适配器抛正确类型 |
 | `AgentState` 字段名 | `agents/state.py` | A 股上下文注入与分析产物读取 | 报告字段为空、agent 拿不到上下文 | 冒烟测试断言 key 集合 |
 | `AnalystNodeSpec` / `ANALYST_NODE_SPECS` | `graph/analyst_execution.py` | 自建图复用分析师规格 | 自建图无法生成节点 | 同上 |
+| `_analyst_graph()` + `DEBATE_PATH_MAP` / `RISK_ANALYSIS_PATH_MAP`（**私有**） | `graph/setup.py` | CN 图重建时复用分析师子图与条件边映射 | 上游改签名/改名 → 下图失败 | `test_upstream_compat` + `test_cn_sentiment_agent` |
 | `create_*` 工厂签名 `(llm) -> node(state) -> dict` | `agents/**` | 自建图直接复用节点 | 图编译期 TypeError | 图冒烟测试 |
 | `TradingAgentsGraph.resolve_instrument_context` | `graph/trading_graph.py:117` | 唯一的横切 prompt 注入缝 | A 股事实注入失效 | 测试覆写后 prompt 含关键字 |
 | `TradingAgentsGraph._run_signature`（**私有**） | `graph/trading_graph.py:140` | checkpoint 线程 ID 需含下游配置 | resume 命中旧形状检查点 | 测试：配置变 → ID 变 |

@@ -55,6 +55,9 @@ DEFAULT_CN_CONFIG: dict = {
     "cn_formula_version": FINANCIAL_FORMULA_VERSION,
     "cn_rules_version": MARKET_RULES_VERSION,
     "cn_data_schema_version": DATA_SCHEMA_VERSION,
+    #: Use the downstream A-share analysts (Xueqiu sentiment) instead of the
+    #: upstream US-centric ones. Only meaningful for CN_A_SHARE.
+    "cn_downstream_analysts": True,
     #: Development escape hatch: allow resumable checkpoints from a dirty tree.
     "cn_allow_dirty_checkpoint": False,
     #: Strict A-share mode: chains become Tushare-only, so a Tushare outage is

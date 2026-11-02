@@ -98,7 +98,7 @@ CLS 代码覆盖不是 100%（比亚迪、赛力斯两条实测无代码），�
 | `get_global_news` | ⚠️ 仍是 Yahoo，内容偏美股科技；需中国相关性源 |
 | `get_macro_indicators` | ✅ 已封装（CN profile：CPI/PPI/GDP/M2/社融/PMI/SHIBOR；LPR/10Y 显式拒绝） |
 | `get_prediction_markets` | ⚠️ 语义不适用，待决定（§4） |
-| 社交情绪 | ⚠️ 雪球接口就绪（`fetch_stock_comments` / `fetch_stock_items(discuss)` / `fetch_hot_posts`），**尚未接 agent** |
+| 社交情绪 | ✅ 已接下游情绪分析师（雪球评论/帖子/热帖；海外仍走 StockTwits/Reddit） |
 | 公司事件（市场级） | ✅ CLS `announcement` 接口就绪 + 代码提取（未接线 agent） |
 
 ## 7. B3 前必须先确认的三件事
