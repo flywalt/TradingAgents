@@ -130,6 +130,21 @@
     return 'idle';
   }
 
+  /* A hand-off is an event, not a state: the line flows once, briefly, when
+   * the finished stage hands its work to the next one - then it is the next
+   * stage's business, and a debate running for rounds must not keep the wire
+   * flashing the whole time. Each wire flows at most once per run. */
+  var flowed = {};
+
+  function handOff(path, from, to) {
+    if (to !== 'active' || from !== 'done') return;
+    var key = path.dataset.from + '>' + path.dataset.to;
+    if (flowed[key]) return;
+    flowed[key] = true;
+    path.classList.add('is-flowing');
+    setTimeout(function () { path.classList.remove('is-flowing'); }, 2400);
+  }
+
   function paint() {
     if (!svg) return;
     Array.prototype.forEach.call(svg.querySelectorAll('[data-node]'), function (group) {
@@ -139,8 +154,7 @@
       var from = stateOf(path.dataset.from);
       var to = stateOf(path.dataset.to);
       var classes = ['edge', 'edge--' + path.dataset.kind];
-      // A hand-off is live while the next node works and the previous one is done.
-      if (to === 'active' && from === 'done') classes.push('is-flowing');
+      handOff(path, from, to);
       if (state.debate && state.debate.indexOf(path.dataset.from) >= 0 &&
           state.debate.indexOf(path.dataset.to) >= 0) {
         classes.push('is-debate');
