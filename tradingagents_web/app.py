@@ -195,6 +195,36 @@ def create_app(
             "portfolio_json": portfolio_json,
         }
 
+    # A browser that opens a page without a cookie gets a small form to type
+    # the token into; API clients keep receiving JSON.
+    @app.exception_handler(HTTPException)
+    async def http_exception(request: Request, exc: HTTPException):
+        if exc.status_code != 401 or "text/html" not in request.headers.get("accept", ""):
+            return JSONResponse({"detail": exc.detail}, status_code=exc.status_code)
+        return HTMLResponse(f"""<!doctype html>
+<html lang="zh"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>登录 · TradingAgents CN</title>
+<style>
+ body {{ margin: 0; display: grid; place-items: center; min-height: 100vh;
+   background: #faf9f6; color: #1c1f23;
+   font: 16px/1.6 system-ui, "PingFang SC", "Microsoft YaHei", sans-serif; }}
+ form {{ display: grid; gap: 12px; width: min(22rem, 90vw); padding: 24px;
+   background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; }}
+ h1 {{ margin: 0; font-size: 1.1rem; }}
+ input {{ padding: 10px 12px; border: 1px solid #e5e7eb; border-radius: 8px;
+   font: inherit; }}
+ button {{ padding: 10px; border: 0; border-radius: 8px; background: #087a59;
+   color: #fff; font: inherit; cursor: pointer; }}
+ p {{ margin: 0; color: #6b7280; font-size: .85rem; }}
+</style></head><body>
+<form method="get" action="/login">
+ <h1>TradingAgents CN</h1>
+ <input name="token" type="password" placeholder="访问口令" autofocus required>
+ <button type="submit">进入</button>
+ <p>口令在服务器的 .env（TRADINGAGENTS_WEB_TOKEN）。</p>
+</form></body></html>""", status_code=401)
+
     # ---------------------------------------------------------------- routes
     @app.get("/login")
     def login(request: Request, token: str = ""):
@@ -202,7 +232,10 @@ def create_app(
         if not (security.token_matches(token, token_value) or security.token_matches(token, read_value)):
             raise HTTPException(status_code=401, detail="bad token")
         response = RedirectResponse("/", status_code=303)
-        response.set_cookie("tg_web_token", token, httponly=True, samesite="lax")
+        # thirty days: a LAN shell should survive a browser restart, not
+        # greet its only user with "token required" every morning
+        response.set_cookie("tg_web_token", token, httponly=True, samesite="lax",
+                            max_age=30 * 24 * 3600)
         return response
 
     @app.get("/healthz")
