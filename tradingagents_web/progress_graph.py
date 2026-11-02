@@ -98,7 +98,6 @@ _NARROW = {
     "analyst_width": 240,
     "analyst_x": 60,
     "analyst_gap": 16,
-    "merge_y": 424.0,
     "default_width": 240,
     "boxes": {
         "memory": (60, 860),
@@ -306,17 +305,12 @@ def _edges_vertical(nodes: dict[str, dict], spec: dict, groups: dict) -> list[di
                        f"{_n(input_group['y'] + input_group['h'])} "
                        f"V {_n(research['y'])}"))
     edges.append(_edge("bull", "bear", "debate", _across(nodes["bull"], nodes["bear"])))
-    # the debate's outcome is one thing: both debaters meet a shared merge line
-    # and a single drop enters the manager - not two competing elbows
+    # a debate hands over as one thing: the manager reads the whole exchange,
+    # not one debater's take - so the group speaks, as in the wide picture
     manager = nodes["research-manager"]
-    entry = _centre_x(manager)
-    for source in ("bull", "bear"):
-        src = nodes[source]
-        x1 = _centre_x(src)
-        y1 = src["y"] + src["h"]
-        edges.append(_edge(source, "research-manager", "flow",
-                           f"M {_n(x1)} {_n(y1)} V {_n(spec['merge_y'])} "
-                           f"H {_n(entry)} V {_n(manager['y'])}"))
+    edges.append(_edge("research", "research-manager", "flow",
+                       f"M {_n(research['x'] + research['w'] / 2)} "
+                       f"{_n(research['y'] + research['h'])} V {_n(manager['y'])}"))
     edges.append(_edge("research-manager", "trader", "flow",
                        _drop(nodes["research-manager"], nodes["trader"])))
     edges.append(_edge("trader", "risk", "flow",
@@ -327,8 +321,10 @@ def _edges_vertical(nodes: dict[str, dict], spec: dict, groups: dict) -> list[di
                        _diagonal(nodes["risk-conservative"], nodes["risk-neutral"], "bottom", "right")))
     edges.append(_edge("risk-neutral", "risk-aggressive", "debate",
                        _diagonal(nodes["risk-neutral"], nodes["risk-aggressive"], "left", "bottom")))
-    edges.append(_edge("risk-neutral", "portfolio", "flow",
-                       _drop(nodes["risk-neutral"], nodes["portfolio"])))
+    # the risk loop concludes as one decision as well
+    edges.append(_edge("risk", "portfolio", "flow",
+                       f"M {_n(risk['x'] + risk['w'] / 2)} "
+                       f"{_n(risk['y'] + risk['h'])} V {_n(nodes['portfolio']['y'])}"))
     edges.append(_edge("memory", "portfolio", "bypass",
                        _bypass(nodes["memory"], nodes["portfolio"], spec["margin_x"])))
     return edges

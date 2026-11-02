@@ -161,20 +161,26 @@ def test_wide_the_debate_stage_speaks_with_one_line():
                                     f"H {manager['x']}")
 
 
-def test_narrow_the_debate_merges_into_one_line_before_the_manager():
-    """Two debaters, one outcome: a shared merge line, a single entry drop."""
-    layout = progress_graph.topology(ALL)["narrow"]
+@pytest.mark.parametrize("width", ["wide", "narrow"])
+def test_a_debate_stage_hands_over_as_one_voice(width):
+    """The manager reads the whole exchange, so the group speaks - in both
+    layouts, and never one debater's own line."""
+    layout = progress_graph.topology(ALL)[width]
     boxes = _boxes(layout)
     manager = boxes["research-manager"]
-    into_manager = [e for e in layout["edges"] if e["to"] == "research-manager"]
+    portfolio = boxes["portfolio"]
 
-    assert {e["from"] for e in into_manager} == {"bull", "bear"}
-    entries = set()
-    for edge in into_manager:
-        merge_y = edge["d"].split(" ")[3]
-        assert edge["d"].endswith(f"V {manager['y']}")
-        entries.add((merge_y, edge["d"].split(" H ")[-1].split(" ")[0]))
-    assert len(entries) == 1                      # one merge line, one entry x
+    into_manager = [e for e in layout["edges"] if e["to"] == "research-manager"]
+    assert [(e["from"], e["kind"]) for e in into_manager] == [("research", "flow")]
+
+    into_portfolio = [e["from"] for e in layout["edges"]
+                      if e["to"] == "portfolio" and e["kind"] == "flow"]
+    assert into_portfolio == ["risk"]
+
+    # no debater emits its own outgoing line in either layout
+    debaters = {"bull", "bear", "risk-aggressive", "risk-conservative", "risk-neutral"}
+    assert not [e for e in layout["edges"]
+                if e["kind"] == "flow" and e["from"] in debaters]
 
 
 @pytest.mark.parametrize("width", ["wide", "narrow"])
