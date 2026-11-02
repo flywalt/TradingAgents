@@ -167,7 +167,6 @@ def test_a_debate_stage_hands_over_as_one_voice(width):
     layouts, and never one debater's own line."""
     layout = progress_graph.topology(ALL)[width]
     boxes = _boxes(layout)
-    manager = boxes["research-manager"]
     portfolio = boxes["portfolio"]
 
     into_manager = [e for e in layout["edges"] if e["to"] == "research-manager"]
@@ -175,7 +174,7 @@ def test_a_debate_stage_hands_over_as_one_voice(width):
 
     into_portfolio = [e["from"] for e in layout["edges"]
                       if e["to"] == "portfolio" and e["kind"] == "flow"]
-    assert into_portfolio == ["risk"]
+    assert into_portfolio == ["risk"]  # the loop concludes as one decision
 
     # no debater emits its own outgoing line in either layout
     debaters = {"bull", "bear", "risk-aggressive", "risk-conservative", "risk-neutral"}
