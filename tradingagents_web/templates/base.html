@@ -3,17 +3,26 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="color-scheme" content="light dark">
-  <title>{% block title %}TradingAgents{% endblock %}</title>
+  <meta name="color-scheme" content="dark">
+  <meta name="description" content="{% block description %}本地股票研究终端：提交一次分析，跟踪节点进度，回看历史运行与评级。{% endblock %}">
+  <title>{% block title %}TradingAgents{% endblock %} · TradingAgents CN</title>
   <link rel="icon" href="data:,">
-  <link rel="stylesheet" href="/static/app.css?v=2">
+  <link rel="stylesheet" href="/static/app.css?v=3">
 </head>
 <body>
-  <header>
-    <a class="brand" href="/">TradingAgents<span>CN</span></a>
-    <nav><a href="/">发起分析</a><a href="/history">历史</a></nav>
+  <a class="skip" href="#main">跳到主要内容</a>
+  <header class="topbar">
+    <div class="topbar__inner">
+      <a class="brand" href="/" aria-label="TradingAgents CN 首页">TradingAgents<span class="brand__suffix">CN</span></a>
+      <nav class="nav" aria-label="主导航">
+        <a href="/" {% if request.url.path == '/' %}aria-current="page"{% endif %}>发起分析</a>
+        <a href="/history" {% if request.url.path.startswith('/history') %}aria-current="page"{% endif %}>历史</a>
+      </nav>
+    </div>
   </header>
-  <main>{% block body %}{% endblock %}</main>
+  <main id="main" class="container">
+    {% block body %}{% endblock %}
+  </main>
   {% block script %}{% endblock %}
 </body>
 </html>

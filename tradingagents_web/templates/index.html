@@ -1,70 +1,87 @@
 {% extends "base.html" %}
 {% block title %}发起分析{% endblock %}
+{% block description %}提交一次 A 股或海外标的分析，选择分析师与日期，随后跟踪节点进度并查看评级报告。{% endblock %}
 {% block body %}
-<section class="card">
+{% set status_labels = {'queued': '排队中', 'running': '运行中', 'succeeded': '已完成', 'failed': '失败'} %}
+{% set analyst_names = {'market': '市场', 'social': '社媒', 'news': '新闻', 'fundamentals': '基本面'} %}
+<section class="page-head">
   <h1>发起分析</h1>
-  <p class="hint">A 股走 Tushare + 雪球；其他市场走上游默认数据源。一次分析耗时约 2–10 分钟。</p>
-  <form id="run-form" autocomplete="off">
-    <label class="field">
-      <span>标的</span>
-      <input name="symbol" id="symbol" placeholder="600519.SH" required inputmode="text">
-      <small id="preview" class="hint">输入代码后失焦可预览规范代码与市场</small>
-    </label>
-    <div class="row">
-      <label class="field">
-        <span>分析日期</span>
-        <input name="date" type="date" value="{{ today }}" max="{{ today }}" required>
-      </label>
-      <label class="field">
-        <span>输出语言</span>
-        <select name="language">
-          {% for l in languages %}<option value="{{ l }}" {% if l == default_language %}selected{% endif %}>{{ l }}</option>{% endfor %}
-        </select>
-      </label>
-    </div>
-    <fieldset>
-      <legend>分析师</legend>
-      <div class="checks">
-      {% for a in analysts %}
-        <label class="check"><input type="checkbox" name="analysts" value="{{ a }}" checked> {{ a }}</label>
-      {% endfor %}
-      </div>
-    </fieldset>
-    <label class="check">
-      <input type="checkbox" name="strict">
-      严格模式
-      <small class="hint">仅 A 股可用：强制只走 Tushare，失败就报“数据不可用”，不静默回退到 Yahoo。默认关闭。</small>
-    </label>
-    <details>
-      <summary>组合（可选 JSON）</summary>
-      <textarea name="portfolio" rows="4" placeholder='{"cash": 100000, "currency": "CNY", "positions": []}'></textarea>
-    </details>
-    <div class="actions">
-      <button id="submit" type="submit">开始分析</button>
-      <span id="form-note" class="hint" role="status" aria-live="polite"></span>
-    </div>
-    <p id="form-error" class="error" role="alert"></p>
-  </form>
+  <p class="page-head__line">A 股走 Tushare 和雪球，其他市场走上游默认数据源。一次分析约 2 至 10 分钟。</p>
 </section>
 
-<section class="card">
-  <h2>最近</h2>
-  <div class="table-wrap">
-    <table>
-      <thead><tr><th>时间</th><th>标的</th><th>状态</th><th>评级</th></tr></thead>
-      <tbody>
-      {% for r in runs %}
-        <tr><td class="muted">{{ r.created_at[5:16].replace('T', ' ') }}</td>
-            <td><a href="/runs/{{ r.id }}">{{ r.symbol }}</a></td>
-            <td><span class="chip {{ r.status }}">{{ r.status }}</span></td>
-            <td>{{ (r.rating or "") | rating_label }}</td></tr>
-      {% else %}
-        <tr><td colspan="4" class="muted">还没有分析记录</td></tr>
-      {% endfor %}
-      </tbody>
-    </table>
-  </div>
-</section>
+<div class="workbench">
+  <section class="pane pane--form" aria-labelledby="form-title">
+    <div class="pane__head">
+      <h2 id="form-title">新建分析</h2>
+    </div>
+    <form id="run-form" autocomplete="off">
+      <div class="field">
+        <label for="symbol">标的</label>
+        <input class="input input--code" name="symbol" id="symbol" placeholder="600519.SH" required inputmode="text" spellcheck="false">
+        <small id="preview" class="hint">输入代码后失焦可预览规范代码与市场</small>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label for="run-date">分析日期</label>
+          <input class="input mono" id="run-date" name="date" type="date" value="{{ today }}" max="{{ today }}" required>
+        </div>
+        <div class="field">
+          <label for="run-language">输出语言</label>
+          <select class="input" id="run-language" name="language">
+            {% for l in languages %}<option value="{{ l }}" {% if l == default_language %}selected{% endif %}>{{ l }}</option>{% endfor %}
+          </select>
+        </div>
+      </div>
+      <fieldset class="group">
+        <legend class="label">分析师</legend>
+        <div class="analysts">
+        {% for a in analysts %}
+          <label class="analyst"><input type="checkbox" name="analysts" value="{{ a }}" checked><span>{{ analyst_names.get(a, a) }}</span></label>
+        {% endfor %}
+        </div>
+      </fieldset>
+      <label class="strict">
+        <input type="checkbox" name="strict">
+        <span class="strict__body">
+          <span class="strict__title">严格模式</span>
+          <small class="hint">仅 A 股可用：强制只走 Tushare，失败就报“数据不可用”，不静默回退到 Yahoo。默认关闭。</small>
+        </span>
+      </label>
+      <details class="disclosure">
+        <summary>组合（可选 JSON）</summary>
+        <textarea class="input input--code" name="portfolio" rows="4" placeholder='{"cash": 100000, "currency": "CNY", "positions": []}'></textarea>
+      </details>
+      <div class="actions">
+        <button class="btn btn--primary" id="submit" type="submit">开始分析</button>
+        <span id="form-note" class="hint" role="status" aria-live="polite"></span>
+      </div>
+      <p id="form-error" class="error" role="alert"></p>
+    </form>
+  </section>
+
+  <section class="pane pane--recent" aria-labelledby="recent-title">
+    <div class="pane__head">
+      <h2 id="recent-title">最近</h2>
+    </div>
+    <div class="table-wrap">
+      <table class="ledger">
+        <thead><tr><th scope="col">时间</th><th scope="col">标的</th><th scope="col">状态</th><th scope="col">评级</th></tr></thead>
+        <tbody>
+        {% for r in runs %}
+          <tr>
+            <td class="mono muted" data-label="时间">{{ r.created_at[5:16].replace('T', ' ') }}</td>
+            <td data-label="标的"><a class="sym" href="/runs/{{ r.id }}">{{ r.symbol }}</a></td>
+            <td data-label="状态"><span class="chip {{ r.status }}">{{ status_labels.get(r.status, r.status) }}</span></td>
+            <td data-label="评级">{{ (r.rating or "") | rating_label }}</td>
+          </tr>
+        {% else %}
+          <tr><td colspan="4" class="empty">还没有分析记录</td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+</div>
 {% endblock %}
 {% block script %}
 <script>
@@ -75,6 +92,7 @@
   const errorBox = document.getElementById('form-error');
   const note = document.getElementById('form-note');
   const button = document.getElementById('submit');
+  const profileLabels = {CN_A_SHARE: 'A 股', UPSTREAM_DEFAULT: '海外默认'};
 
   symbolInput.addEventListener('blur', async () => {
     if (!symbolInput.value.trim()) return;
@@ -82,7 +100,7 @@
       const res = await fetch('/api/preview?symbol=' + encodeURIComponent(symbolInput.value));
       const data = await res.json();
       if (res.ok) {
-        preview.textContent = data.symbol + ' · ' + data.profile + (data.name ? ' · ' + data.name : '');
+        preview.textContent = data.symbol + '，' + (profileLabels[data.profile] || data.profile) + (data.name ? '，' + data.name : '');
         preview.className = 'hint ok';
       } else {
         preview.textContent = (data.error && data.error.message) || '无法预览';

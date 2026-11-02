@@ -1,50 +1,73 @@
 {% extends "base.html" %}
 {% block title %}{{ run.symbol }} {{ run.trade_date }}{% endblock %}
+{% block description %}运行记录 {{ run.symbol }} {{ run.trade_date }}：节点进度、评级与报告入口。{% endblock %}
 {% block body %}
-<section class="card">
-  <div class="headline">
-    <div>
-      <h1>{{ run.symbol }}</h1>
-      <p class="hint">{{ run.trade_date }} · {{ run.profile }} · {{ run.language }}</p>
+{% set status_labels = {'queued': '排队中', 'running': '运行中', 'succeeded': '已完成', 'failed': '失败'} %}
+{% set profile_names = {'CN_A_SHARE': 'A 股', 'UPSTREAM_DEFAULT': '海外默认'} %}
+{% set running = run.status in ('queued', 'running') %}
+<section class="run-record">
+  <div class="run-record__body">
+    <div class="run-record__id">
+      <h1 class="run-symbol">{{ run.symbol }}</h1>
+      <dl class="facts">
+        <div><dt>交易日</dt><dd class="mono">{{ run.trade_date }}</dd></div>
+        <div><dt>市场</dt><dd title="{{ run.profile }}">{{ profile_names.get(run.profile, run.profile) }}</dd></div>
+        <div><dt>语言</dt><dd>{{ run.language }}</dd></div>
+        <div><dt>提交</dt><dd class="mono">{{ run.created_at[5:16].replace('T', ' ') }}</dd></div>
+        {% if not running %}
+        <div>
+          <dt>用时</dt>
+          <dd><span id="elapsed" class="mono" data-status="{{ run.status }}" data-started="{{ run.started_at or run.created_at }}" data-finished="{{ run.finished_at or '' }}"></span></dd>
+        </div>
+        {% endif %}
+      </dl>
     </div>
-    <span id="status" class="chip {{ run.status }}">{{ run.status }}</span>
+    <div class="run-record__reading">
+      <span id="status" class="chip {{ run.status }}" role="status">{{ status_labels.get(run.status, run.status) }}</span>
+      {% if run.rating %}
+        <p class="reading__label">评级</p>
+        <p class="reading">{{ run.rating | rating_label }}</p>
+      {% elif running %}
+        <p class="reading__label">{% if run.status == 'queued' %}已等待{% else %}已运行{% endif %}</p>
+        <p class="reading mono"><span id="elapsed" data-status="{{ run.status }}" data-started="{{ run.started_at or run.created_at }}">00:00</span></p>
+        <p class="run-live">{% if run.status == 'queued' %}已进入队列，开始后可关闭页面。{% else %}正在分析，可关闭页面，稍后到历史查看{% endif %}</p>
+      {% else %}
+        <p class="reading__label">结果</p>
+        <p class="reading reading--bad">{{ status_labels.get(run.status, run.status) }}</p>
+      {% endif %}
+    </div>
   </div>
-
-  <p id="elapsed" class="hint" data-status="{{ run.status }}"
-     data-started="{{ run.started_at or run.created_at }}">
-    {% if run.status in ('queued', 'running') %}正在分析，已运行 00:00{% endif %}
-  </p>
-
-  {% if run.rating %}
-    <p class="rating">评级：<strong>{{ label }}</strong>{% if run.rating == 'REVIEW' %}（需人工复核）{% endif %}</p>
-  {% endif %}
-  <p class="hint">仅供研究，不构成投资建议。</p>
 
   {% if run.error_category %}
-    <div class="error-box">
-      <strong>{{ run.error_category }}</strong>
-      <p>{{ run.error_message }}</p>
-      <p class="hint">可点击下方“重新运行”，或查看运行目录中的 web.log。</p>
-    </div>
+  <div class="notice" role="alert">
+    <p class="notice__title">{{ run.error_category }}</p>
+    <p>{{ run.error_message }}</p>
+    <p class="hint">可点击下方“重新运行”，或查看运行目录中的 web.log。</p>
+  </div>
   {% endif %}
 
-  <div class="actions">
-    {% if run.report_path %}<a class="button" href="/runs/{{ run.id }}/report">打开报告</a>{% endif %}
-    {% if run.run_dir %}<a class="button ghost" href="/runs/{{ run.id }}/files/run_metadata.json">运行元数据</a>{% endif %}
-    {% if run.status in ('succeeded', 'failed') %}
-      <button class="button ghost" id="rerun">重新运行</button>
-    {% endif %}
+  {% if run.report_path or run.status in ('succeeded', 'failed') or run.run_dir %}
+  <div class="run-actions">
+    {% if run.report_path %}<a class="btn btn--primary" href="/runs/{{ run.id }}/report">打开报告</a>{% endif %}
+    {% if run.status in ('succeeded', 'failed') %}<button class="btn {{ 'btn--quiet' if run.report_path else 'btn--primary' }}" id="rerun" type="button">重新运行</button>{% endif %}
+    {% if run.run_dir %}<a class="btn btn--quiet" href="/runs/{{ run.id }}/files/run_metadata.json">运行元数据</a>{% endif %}
   </div>
-  {% if kviewer %}
-    <p class="hint"><a href="{{ kviewer }}/#/kline?symbol={{ run.symbol }}&end={{ run.trade_date | replace('-', '') }}">在 kviewer 打开（锚定 {{ run.trade_date }}）</a></p>
   {% endif %}
+
+  {% if kviewer %}
+  <p class="run-link"><a href="{{ kviewer }}/#/kline?symbol={{ run.symbol }}&end={{ run.trade_date | replace('-', '') }}">在 kviewer 打开</a><span class="run-link__anchor">锚定 {{ run.trade_date }}</span></p>
+  {% endif %}
+
+  <p class="fineprint">仅供研究，不构成投资建议。</p>
 </section>
 
-<section class="card">
-  <h2>进度</h2>
-  <ul id="timeline" class="timeline">
-    <li class="muted">等待事件…</li>
-  </ul>
+<section class="panel panel--trail" aria-labelledby="trail-title">
+  <div class="panel__head">
+    <h2 id="trail-title">进度</h2>
+  </div>
+  <ol id="timeline" class="trail" aria-live="polite">
+    <li class="trail__empty" data-empty>{% if running %}等待事件…{% else %}本次运行已结束。{% endif %}</li>
+  </ol>
 </section>
 {% endblock %}
 {% block script %}
@@ -55,37 +78,73 @@
   const el = document.getElementById('timeline');
   const statusChip = document.getElementById('status');
   const elapsed = document.getElementById('elapsed');
-  let last = 0, polling = null;
+  const statusLabels = {queued: '排队中', running: '运行中', succeeded: '已完成', failed: '失败'};
+  const profileLabels = {CN_A_SHARE: 'A 股', UPSTREAM_DEFAULT: '海外默认'};
+  let polling = null;
+  let source = null;
 
-  function add(text) {
+  function add(text, kind, at) {
+    if (el.firstElementChild && el.firstElementChild.hasAttribute('data-empty')) el.innerHTML = '';
     const li = document.createElement('li');
-    li.textContent = text;
-    if (el.firstElementChild && el.firstElementChild.classList.contains('muted')) el.innerHTML = '';
+    li.className = 'trail__item' + (kind ? ' trail__item--' + kind : '');
+    const mark = document.createElement('span');
+    mark.className = 'trail__mark';
+    mark.setAttribute('aria-hidden', 'true');
+    const body = document.createElement('span');
+    body.className = 'trail__text';
+    body.textContent = text;
+    li.appendChild(mark);
+    li.appendChild(body);
+    if (at) {
+      const time = document.createElement('time');
+      time.className = 'trail__time mono';
+      time.dateTime = at;
+      time.textContent = at.slice(11, 19);
+      li.appendChild(time);
+    }
     el.appendChild(li);
   }
 
   function tick() {
-    if (!elapsed.dataset.started || terminal) return;
+    if (!elapsed || !elapsed.dataset.started) return;
     const start = Date.parse(elapsed.dataset.started);
     if (Number.isNaN(start)) return;
     const seconds = Math.max(0, Math.floor((Date.now() - start) / 1000));
     const mm = String(Math.floor(seconds / 60)).padStart(2, '0');
     const ss = String(seconds % 60).padStart(2, '0');
-    elapsed.textContent = '正在分析，已运行 ' + mm + ':' + ss + '（可关闭页面，稍后到历史查看）';
+    elapsed.textContent = mm + ':' + ss;
   }
 
-  if (!terminal) {
+  function duration() {
+    if (!elapsed || !elapsed.dataset.finished) return;
+    const start = Date.parse(elapsed.dataset.started);
+    const end = Date.parse(elapsed.dataset.finished);
+    if (Number.isNaN(start) || Number.isNaN(end)) return;
+    const seconds = Math.max(0, Math.floor((end - start) / 1000));
+    elapsed.textContent = String(Math.floor(seconds / 60)).padStart(2, '0') + ':' +
+      String(seconds % 60).padStart(2, '0');
+  }
+
+  function handle(data) {
+    if (data.kind === 'run.started') add('开始运行 ' + (profileLabels[data.payload.profile] || data.payload.profile || ''), 'start', data.at);
+    else if (data.kind === 'node.started') add('开始 ' + data.payload.node, 'node', data.at);
+    else if (data.kind === 'node.finished') add('完成 ' + data.payload.node, 'done', data.at);
+    else if (data.kind === 'report.ready') add('报告已生成 ' + data.payload.key, 'report', data.at);
+    else if (data.kind === 'run.finished' || data.kind === 'run.failed') {
+      if (source) source.close();
+      if (!terminal) location.reload();
+    }
+  }
+
+  if (terminal) {
+    duration();
+    source = new EventSource('/api/runs/' + runId + '/events');
+    source.onmessage = function (event) { handle(JSON.parse(event.data)); };
+    source.onerror = function () { source.close(); };
+  } else {
     setInterval(tick, 1000); tick();
-    const source = new EventSource('/api/runs/' + runId + '/events');
-    source.onmessage = function (event) {
-      const data = JSON.parse(event.data);
-      if (data.kind === 'run.started') add('开始运行 · ' + (data.payload.profile || ''));
-      else if (data.kind === 'node.started') add('▶ ' + data.payload.node);
-      else if (data.kind === 'node.finished') add('✓ ' + data.payload.node);
-      else if (data.kind === 'report.ready') add('📄 ' + data.payload.key);
-      else if (data.kind === 'run.finished') { source.close(); location.reload(); }
-      else if (data.kind === 'run.failed') { source.close(); location.reload(); }
-    };
+    source = new EventSource('/api/runs/' + runId + '/events');
+    source.onmessage = function (event) { handle(JSON.parse(event.data)); };
     source.onerror = function () {
       source.close();
       if (polling) return;
@@ -93,7 +152,7 @@
         const res = await fetch('/api/runs/' + runId);
         if (!res.ok) return;
         const data = await res.json();
-        statusChip.textContent = data.status;
+        statusChip.textContent = statusLabels[data.status] || data.status;
         if (data.status === 'succeeded' || data.status === 'failed') location.reload();
       }, 5000);
     };

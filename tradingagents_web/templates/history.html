@@ -1,38 +1,62 @@
 {% extends "base.html" %}
 {% block title %}历史{% endblock %}
+{% block description %}按标的、状态和评级筛选过去的分析运行，回看每次运行的评级与报告。{% endblock %}
 {% block body %}
-<section class="card">
+{% set status_labels = {'queued': '排队中', 'running': '运行中', 'succeeded': '已完成', 'failed': '失败'} %}
+<section class="page-head">
   <h1>历史（{{ total }}）</h1>
-  <form method="get" class="filters">
-    <input name="symbol" placeholder="600519.SH" value="{{ symbol }}">
-    <select name="status">
+  <p class="page-head__line">按提交时间倒序，可按标的、状态和评级筛选。</p>
+</section>
+
+<form method="get" class="filters" aria-label="筛选运行记录">
+  <div class="field">
+    <label for="f-symbol">标的</label>
+    <input class="input input--code" id="f-symbol" name="symbol" placeholder="600519.SH" value="{{ symbol }}" spellcheck="false">
+  </div>
+  <div class="field">
+    <label for="f-status">状态</label>
+    <select class="input" id="f-status" name="status">
       <option value="">全部状态</option>
       {% for s in ['queued','running','succeeded','failed'] %}
-        <option value="{{ s }}" {% if status == s %}selected{% endif %}>{{ s }}</option>
+        <option value="{{ s }}" {% if status == s %}selected{% endif %}>{{ status_labels[s] }}</option>
       {% endfor %}
     </select>
-    <input name="rating" placeholder="评级" value="{{ rating }}">
-    <button type="submit">筛选</button>
-  </form>
-  <div class="table-wrap">
-    <table>
-      <thead><tr><th>时间</th><th>标的</th><th>日期</th><th>状态</th><th>评级</th></tr></thead>
-      <tbody>
-      {% for r in runs %}
-        <tr><td class="muted">{{ r.created_at[5:16].replace('T', ' ') }}</td>
-            <td><a href="/runs/{{ r.id }}">{{ r.symbol }}</a></td>
-            <td class="muted">{{ r.trade_date }}</td>
-            <td><span class="chip {{ r.status }}">{{ r.status }}</span></td>
-            <td>{{ (r.rating or "") | rating_label }}</td></tr>
-      {% else %}
-        <tr><td colspan="5" class="muted">没有匹配的记录</td></tr>
+  </div>
+  <div class="field">
+    <label for="f-rating">评级</label>
+    <select class="input" id="f-rating" name="rating">
+      <option value="">全部评级</option>
+      {% for r in ['Buy','Overweight','Hold','Underweight','Sell','REVIEW'] %}
+        <option value="{{ r }}" {% if rating == r %}selected{% endif %}>{{ r | rating_label }}</option>
       {% endfor %}
-      </tbody>
-    </table>
+    </select>
   </div>
-  <div class="pager">
-    {% if page > 1 %}<a class="button ghost" href="?page={{ page - 1 }}&symbol={{ symbol }}&status={{ status }}&rating={{ rating }}">上一页</a>{% endif %}
-    {% if page * 20 < total %}<a class="button ghost" href="?page={{ page + 1 }}&symbol={{ symbol }}&status={{ status }}&rating={{ rating }}">下一页</a>{% endif %}
+  <div class="filters__action">
+    <button class="btn btn--primary" type="submit">筛选</button>
   </div>
-</section>
+</form>
+
+<div class="table-wrap">
+  <table class="ledger">
+    <thead><tr><th scope="col">时间</th><th scope="col">标的</th><th scope="col">日期</th><th scope="col">状态</th><th scope="col">评级</th></tr></thead>
+    <tbody>
+    {% for r in runs %}
+      <tr>
+        <td class="mono muted" data-label="时间">{{ r.created_at[5:16].replace('T', ' ') }}</td>
+        <td data-label="标的"><a class="sym" href="/runs/{{ r.id }}">{{ r.symbol }}</a></td>
+        <td class="mono muted" data-label="日期">{{ r.trade_date }}</td>
+        <td data-label="状态"><span class="chip {{ r.status }}">{{ status_labels.get(r.status, r.status) }}</span></td>
+        <td data-label="评级">{{ (r.rating or "") | rating_label }}</td>
+      </tr>
+    {% else %}
+      <tr><td colspan="5" class="empty">没有匹配的记录</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<div class="pager">
+  {% if page > 1 %}<a class="btn btn--quiet" href="?page={{ page - 1 }}&symbol={{ symbol }}&status={{ status }}&rating={{ rating }}">上一页</a>{% endif %}
+  {% if page * 20 < total %}<a class="btn btn--quiet" href="?page={{ page + 1 }}&symbol={{ symbol }}&status={{ status }}&rating={{ rating }}">下一页</a>{% endif %}
+</div>
 {% endblock %}
