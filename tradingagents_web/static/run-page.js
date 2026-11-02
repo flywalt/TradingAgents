@@ -137,6 +137,7 @@
   var flowed = {};
 
   function handOff(path, from, to) {
+    if (path.dataset.kind !== 'flow') return;   // debates have their own motion
     if (to !== 'active' || from !== 'done') return;
     var key = path.dataset.from + '>' + path.dataset.to;
     if (flowed[key]) return;
