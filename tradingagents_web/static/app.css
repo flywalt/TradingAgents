@@ -975,13 +975,6 @@ input[type="checkbox"] {
   animation: graph-flow 700ms linear infinite;
 }
 
-.graph .edge.is-debate {
-  stroke: var(--color-cool);
-  stroke-width: 1.4;
-  stroke-dasharray: 4 4;
-  animation: graph-flow 900ms linear infinite;
-}
-
 @keyframes graph-flow { to { stroke-dashoffset: -20; } }
 
 /* Narrow layout sets a smaller type scale for its 78px boxes. */
