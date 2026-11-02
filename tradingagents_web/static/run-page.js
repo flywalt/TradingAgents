@@ -243,7 +243,14 @@
         handle(event);
         if (event.payload && event.payload.final) { settle(); source.close(); }
       };
-      source.onerror = function () { source.close(); };
+      source.onerror = function () {
+        // The stream ends without a "final" payload whenever a run was
+        // recovered rather than finished (a restart mid-run marks the job
+        // failed without appending run.failed). The run is over either way:
+        // settle it instead of leaving a node pulsing forever.
+        settle();
+        source.close();
+      };
     } else {
       var polling = null;
       source.onmessage = function (message) {

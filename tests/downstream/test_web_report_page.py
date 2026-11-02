@@ -72,8 +72,30 @@ def test_a_report_without_a_rating_is_left_alone():
     assert '<h1><span class="ticker">600519.SH</span></h1>' in out
 
 
+def _upstream_report() -> str:
+    from tradingagents.report_html import render_report
+
+    final_state = {"trade_date": "2026-10-30", "final_rating": "Hold",
+                   "final_trade_decision": "Hold", "memory_note": "kept"}
+    settings = {"deep_think_provider": "openai_compatible", "quick_think_provider":
+                "openai_compatible", "llm_provider": "openai_compatible",
+                "deep_think_llm": "m1", "quick_think_llm": "m2",
+                "analysts": ("market", "news"), "max_debate_rounds": 1,
+                "max_risk_discuss_rounds": 1,
+                "data_vendors": {"prices": ["tushare", "yfinance"]},
+                "tool_vendors": {}, "version": "0.7.1"}
+    parts = [("I. Analyst Team Reports", "1_analysts",
+              [("Market Analyst", "market.md", "# 市场")])]
+    return render_report("600519.SH", final_state, settings, parts)
+
+
 def test_the_markup_we_match_is_still_produced_upstream():
-    """Fragile coupling: if upstream renames its markup this fails at sync time."""
+    """Fragile coupling: if upstream renames its markup this fails at sync time.
+
+    Every marker is asserted against a real ``render_report`` output, not against
+    our own list: this test is the fuse that turns an upstream rename into a red
+    suite instead of a page quietly reverting to English.
+    """
     from tradingagents import reporting
 
     headings = [heading for heading, _folder, _agents in reporting._SECTIONS]
@@ -82,7 +104,6 @@ def test_the_markup_we_match_is_still_produced_upstream():
         "III. Trading Team Plan", "IV. Risk Management Team Decision",
         "V. Portfolio Manager Decision",
     ]
-    for marker in ('<html lang="en">', '<p class="date">Analysis of ',
-                   '<a class="to-top" href="#top">Top</a>', '<dt>Generated</dt>',
-                   '<span class="rating ', 'aria-label="Sections"'):
-        assert marker in report_page.UPSTREAM_MARKERS, marker
+    html = _upstream_report()
+    for marker in report_page.UPSTREAM_MARKERS:
+        assert marker in html, marker
