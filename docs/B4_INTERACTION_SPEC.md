@@ -219,12 +219,35 @@ rating = run_rating(final)                                   # 五档 or REVIEW
 | 页面 | 内容 |
 | --- | --- |
 | `/` | 表单（symbol+预览、date、analysts、语言、strict 仅 CN、portfolio 折叠）+ 最近 10 条 |
-| `/runs/{id}` | 状态、节点时间线、评级 / REVIEW 警告、报告入口、错误卡片（category+action） |
-| `/runs/{id}/report` | iframe 沙箱内嵌 HTML；上方显示 profile、版本、`job.json` 摘要 |
+| `/runs/{id}` | 状态、**流程图**、节点时间线、评级 / REVIEW 警告、报告入口、错误卡片（category+action） |
+| `/runs/{id}/report` | 沙箱内 HTML（按运行语言呈现）；上方显示 profile、版本、`job.json` 摘要 |
 | `/history` | 过滤 + 分页 |
 
 合规展示：`Buy/Overweight/Hold/Underweight/Sell` → **乐观/中性/审慎**，固定"仅供研究，不构成投资建议"。
 只改展示，不改报告正文。
+
+### 9.1 报告呈现层（本地化）
+
+报告在**服务时**本地化，磁盘产物保持内核原样：
+
+- 内核 `save_reports()` 返回 `complete_report.md`，并在同目录写 `complete_report.html`；路由优先发 HTML
+  兄弟文件，只有 markdown 时才按 `text/plain` 发（绝不把 markdown 谎称 `text/html`）。
+- `tradingagents_web/report_page.py::present(html, language)` 在 `language` 为中文时，按**允许清单**
+  替换固定标签（`<html lang>`、`Analysis of …`、7 个 `<dt>`、`Top`、5 个章节标题与序号、评级中文名）。
+  正文一个字不动；英文运行原样返回。
+- 与上游标记的耦合登记在 `docs/UPSTREAM_DELTA.md` 的脆弱耦合栏，由
+  `test_the_markup_we_match_is_still_produced_upstream` 在同步时先报错。
+
+### 9.2 流程图（拓扑与点亮）
+
+- 拓扑与两套坐标由 `tradingagents_web/progress_graph.py::topology(analysts)` 计算（宽屏/窄屏各一套），
+  因此"节点不重叠、都在画布内、边两端存在、未选分析师不画"可以写成测试。
+- 边语义：`flow`（交接）、`debate`（双向来回）、`bypass`（记忆检索旁路）。
+- 画面由 `static/run-page.js` 驱动：`node.started → active`、`node.finished → done`、`run.failed → failed`；
+  上游完成而下游开始时交接边流动；辩论对之间来回；同名节点重复开始即"第 n 轮"。
+- **事件仍是唯一事实来源**：图只反映 `events` 表。历史记录若只有 `node.started` 没有 `node.finished`
+  （`node.finished` 的修复之前产生的运行），终态一律按 `done` 呈现，不留永远"运行中"的节点。
+- 运行页脚本集中在 `static/run-page.js`，页面仍只有一个 `<script>`（`test_each_page_has_exactly_one_script_block`）。
 
 ## 10. 错误分类
 

@@ -220,5 +220,6 @@ git diff --stat upstream/main..HEAD -- tradingagents cli tests pyproject.toml
 | **我们的补丁/方法** | 空结果被标成 `UNAVAILABLE`（`agents/blocks.py`）；SSE 缺 News 节点（`tradingagents_web/runner.py` 的映射）；报告路径取 `.md` 而路由按 HTML 发送；事件并发写 SQLite | 本地修，配测试 |
 | **数据源属性** | RSSHub 只有当前、无历史；Polymarket 只给实时赔率 | 不改代码，写进文档与报告语义 |
 | **上游原始行为** | `stream_run` 不产顶层 task 事件；评级枚举；报告目录默认带时间戳 | 不硬改；用公开 API 或最小补丁，并登记 |
+| **呈现层（只在 Web 内）** | 报告页首中文、流程图的布局与点亮 | 磁盘产物不动；上游改标记由守卫测试先红 |
 
 原则：**能改我们自己的，就不碰上游；能写文档说明的，就不加代码。**
