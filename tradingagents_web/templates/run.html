@@ -80,8 +80,36 @@
   const elapsed = document.getElementById('elapsed');
   const statusLabels = {queued: '排队中', running: '运行中', succeeded: '已完成', failed: '失败'};
   const profileLabels = {CN_A_SHARE: 'A 股', UPSTREAM_DEFAULT: '海外默认'};
+  // Display names only: the stored events keep the kernel's node names, so a
+  // renamed node shows through rather than disappearing.
+  const nodeLabels = {
+    'Market Analyst': '市场分析师', 'Sentiment Analyst': '情绪分析师',
+    'News Analyst': '新闻分析师', 'Fundamentals Analyst': '基本面分析师',
+    'Memory Log': '记忆检索', 'Bull Researcher': '多头研究员',
+    'Bear Researcher': '空头研究员', 'Research Manager': '研究经理',
+    'Trader': '交易员', 'Aggressive Analyst': '激进风险分析师',
+    'Conservative Analyst': '保守风险分析师', 'Neutral Analyst': '中性风险分析师',
+    'Portfolio Manager': '组合经理'
+  };
+  const reportLabels = {
+    market_report: '市场', sentiment_report: '情绪', news_report: '新闻',
+    fundamentals_report: '基本面', investment_plan: '研究结论',
+    trader_investment_plan: '交易方案', final_trade_decision: '组合决策'
+  };
+  const startedAt = new Map();
   let polling = null;
   let source = null;
+
+  function elapsedSince(startIso, endIso) {
+    const start = Date.parse(startIso);
+    // A finished run is replayed from the log, so measure to the event's own
+    // timestamp rather than to now.
+    const end = endIso ? Date.parse(endIso) : Date.now();
+    if (!startIso || Number.isNaN(start) || Number.isNaN(end)) return '';
+    const seconds = Math.max(0, Math.round((end - start) / 1000));
+    if (seconds < 60) return seconds + ' 秒';
+    return Math.floor(seconds / 60) + ' 分 ' + String(seconds % 60).padStart(2, '0') + ' 秒';
+  }
 
   function add(text, kind, at) {
     if (el.firstElementChild && el.firstElementChild.hasAttribute('data-empty')) el.innerHTML = '';
@@ -127,9 +155,15 @@
 
   function handle(data) {
     if (data.kind === 'run.started') add('开始运行 ' + (profileLabels[data.payload.profile] || data.payload.profile || ''), 'start', data.at);
-    else if (data.kind === 'node.started') add('开始 ' + data.payload.node, 'node', data.at);
-    else if (data.kind === 'node.finished') add('完成 ' + data.payload.node, 'done', data.at);
-    else if (data.kind === 'report.ready') add('报告已生成 ' + data.payload.key, 'report', data.at);
+    else if (data.kind === 'node.started') {
+      startedAt.set(data.payload.node, data.at);
+      add('开始 ' + (nodeLabels[data.payload.node] || data.payload.node), 'node', data.at);
+    }
+    else if (data.kind === 'node.finished') {
+      const spent = elapsedSince(startedAt.get(data.payload.node), data.at);
+      add('完成 ' + (nodeLabels[data.payload.node] || data.payload.node) + (spent ? ' · ' + spent : ''), 'done', data.at);
+    }
+    else if (data.kind === 'report.ready') add('报告已生成 · ' + (reportLabels[data.payload.key] || data.payload.key), 'report', data.at);
     else if (data.kind === 'run.finished' || data.kind === 'run.failed') {
       if (source) source.close();
       if (!terminal) location.reload();

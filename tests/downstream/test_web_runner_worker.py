@@ -164,13 +164,46 @@ def test_progress_maps_subgraph_namespaces_to_their_analyst():
     events = []
     progress = Progress(lambda kind, payload: events.append((kind, payload)))
 
-    progress.on_chain_start(None, None, metadata={"langgraph_node": "agent",
-                                                  "langgraph_checkpoint_ns": "news_analyst:abc"})
-    progress.on_chain_end(None, metadata={"langgraph_node": "agent",
-                                          "langgraph_checkpoint_ns": "News Analyst:abc"})
+    progress.on_chain_start(None, None, run_id="outer",
+                            metadata={"langgraph_node": "agent",
+                                      "langgraph_checkpoint_ns": "news_analyst:abc"})
+    # LangChain sends no metadata to on_chain_end; the run id identifies the node.
+    progress.on_chain_end(None, run_id="outer")
 
     assert events == [("node.started", {"node": "News Analyst"}),
                       ("node.finished", {"node": "News Analyst"})]
+
+
+def test_a_nested_chain_does_not_close_its_node():
+    from tradingagents_web.runner import Progress
+
+    events = []
+    progress = Progress(lambda kind, payload: events.append((kind, payload)))
+    meta = {"langgraph_node": "News Analyst"}
+
+    progress.on_chain_start(None, None, run_id="node", metadata=meta)
+    progress.on_chain_start(None, None, run_id="inner", metadata=meta)
+    progress.on_chain_end(None, run_id="inner")
+    progress.on_chain_end(None, run_id="node")
+
+    assert events == [("node.started", {"node": "News Analyst"}),
+                      ("node.finished", {"node": "News Analyst"})]
+
+
+def test_a_node_that_starts_twice_runs_once_in_the_timeline():
+    from tradingagents_web.runner import Progress
+
+    events = []
+    progress = Progress(lambda kind, payload: events.append((kind, payload)))
+    meta = {"langgraph_node": "Trader"}
+
+    progress.on_chain_start(None, None, run_id="a", metadata=meta)
+    progress.on_chain_start(None, None, run_id="b", metadata=meta)
+    progress.on_chain_end(None, run_id="a")
+    progress.on_chain_end(None, run_id="b")
+
+    assert events == [("node.started", {"node": "Trader"}),
+                      ("node.finished", {"node": "Trader"})]
 
 
 def test_progress_ignores_model_and_tool_nodes():
@@ -181,3 +214,42 @@ def test_progress_ignores_model_and_tool_nodes():
     progress.on_chain_start(None, None, metadata={"langgraph_node": "model"})
 
     assert events == []
+
+
+def test_events_can_be_appended_from_several_threads(tmp_path):
+    """LangGraph runs parallel branches in threads; appends must not tear.
+
+    Without serialisation the sequence read and the insert interleave: the run
+    dies with a None from fetchone() or collides on (run_id, seq).
+    """
+    import threading
+
+    from tradingagents_web import db, jobs
+
+    conn = db.connect(tmp_path / "state.db")
+    failures: list[BaseException] = []
+    try:
+        run_id = jobs.create(conn, symbol="600519.SH", market="CN", profile="CN_A_SHARE",
+                             trade_date="2026-10-30", analysts=["market"], language="中文",
+                             strict=False, portfolio_json=None)
+
+        def write(n: int) -> None:
+            try:
+                for i in range(60):
+                    jobs.append_event(conn, run_id, "node.started", {"node": f"n{n}", "i": i})
+            except BaseException as exc:  # noqa: BLE001 - reported, not swallowed
+                failures.append(exc)
+
+        threads = [threading.Thread(target=write, args=(n,)) for n in range(6)]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join()
+
+        events = jobs.events_after(conn, run_id)
+    finally:
+        conn.close()
+
+    assert failures == []
+    assert len(events) == 6 * 60
+    assert [e["seq"] for e in events] == list(range(1, 6 * 60 + 1))

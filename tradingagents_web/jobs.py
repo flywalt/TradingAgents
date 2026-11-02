@@ -4,10 +4,18 @@ from __future__ import annotations
 
 import json
 import sqlite3
+import threading
 import uuid
 from datetime import UTC, datetime
 
 _TERMINAL = {"succeeded", "failed"}
+
+#: LangGraph runs parallel branches in threads, so callbacks write events from
+#: several threads at once. One SQLite connection cannot serve them concurrently
+#: (the sequence read and the insert tear, losing events or killing the run), so
+#: every event append is serialised here. The critical section is one small
+#: statement pair; the run itself stays parallel.
+_EVENT_LOCK = threading.Lock()
 
 
 def _now() -> str:
@@ -93,19 +101,24 @@ def fail(conn: sqlite3.Connection, run_id: str, *, category: str, message: str) 
 
 
 def append_event(conn: sqlite3.Connection, run_id: str, kind: str, payload: dict) -> int:
-    """Append with a per-run sequence number; the stream id is this sequence."""
-    seq = conn.execute(
-        "SELECT COALESCE(MAX(seq), 0) + 1 FROM events WHERE run_id=?", (run_id,)
-    ).fetchone()[0]
-    conn.execute(
-        "INSERT INTO events (run_id, seq, kind, payload, created_at) VALUES (?,?,?,?,?)",
-        (run_id, seq, kind, json.dumps(payload, ensure_ascii=False), _now()),
-    )
-    conn.execute(
-        """DELETE FROM events WHERE run_id=? AND kind='message' AND seq <= ?""",
-        (run_id, seq - 5000),
-    )
-    conn.commit()
+    """Append with a per-run sequence number; the stream id is this sequence.
+
+    Safe to call from any thread: the sequence is read, used and committed under
+    one lock, so concurrent appends cannot collide on (run_id, seq).
+    """
+    with _EVENT_LOCK:
+        seq = conn.execute(
+            "SELECT COALESCE(MAX(seq), 0) + 1 FROM events WHERE run_id=?", (run_id,)
+        ).fetchone()[0]
+        conn.execute(
+            "INSERT INTO events (run_id, seq, kind, payload, created_at) VALUES (?,?,?,?,?)",
+            (run_id, seq, kind, json.dumps(payload, ensure_ascii=False), _now()),
+        )
+        conn.execute(
+            """DELETE FROM events WHERE run_id=? AND kind='message' AND seq <= ?""",
+            (run_id, seq - 5000),
+        )
+        conn.commit()
     return seq
 
 

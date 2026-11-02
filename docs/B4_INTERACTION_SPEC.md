@@ -90,6 +90,12 @@ CREATE UNIQUE INDEX idx_events ON events(run_id, seq);
 
 - 启动恢复：`running` → `failed(interrupted)`；`queued` 按 `created_at` 重新入队。
 - 事件上限 5,000/任务，超出丢最旧的非状态事件。
+- `report_path` 存的是内核 `save_reports()` 的返回值（规范产物 `complete_report.md`）。
+  Web 打开报告时必须**优先取同名 `.html` 兄弟文件**（内核同目录写出）；只有 HTML 缺失时才按
+  `text/plain` 回退。把 markdown 当成 `text/html` 发出去，浏览器会渲染成一大段无格式文本。
+- 事件写入必须可跨线程：LangGraph 的并行分支在线程池中执行，回调会并发写 `events` 表。
+  `jobs.append_event()` 在锁内完成「读 seq + 插入 + 提交」，否则会撞 `(run_id, seq)` 唯一索引
+  或读到空结果，直接让任务失败。
 
 ## 4. 状态机与 worker
 

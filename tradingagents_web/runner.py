@@ -47,7 +47,11 @@ class Progress(BaseCallbackHandler):
 
     def __init__(self, emit):
         self._emit = emit
-        self._open: set[str] = set()
+        # LangChain passes ``metadata`` to on_chain_start only, so a node's
+        # close is identified by the run id recorded at its open. Depth counts
+        # nested chains inside one node so an inner chain cannot close it.
+        self._owners: dict[object, str] = {}
+        self._depth: dict[str, int] = {}
 
     def _node(self, metadata) -> str | None:
         metadata = metadata or {}
@@ -63,17 +67,26 @@ class Progress(BaseCallbackHandler):
                 return node
         return None
 
-    def on_chain_start(self, serialized, inputs, *, metadata=None, **kwargs):
+    def on_chain_start(self, serialized, inputs, *, metadata=None, run_id=None, **kwargs):
         node = self._node(metadata)
-        if node and node not in self._open:
-            self._open.add(node)
+        if not node:
+            return
+        self._owners[run_id] = node
+        depth = self._depth.get(node, 0)
+        self._depth[node] = depth + 1
+        if depth == 0:
             self._emit("node.started", {"node": node})
 
-    def on_chain_end(self, outputs, *, metadata=None, **kwargs):
-        node = self._node(metadata)
-        if node and node in self._open:
-            self._open.discard(node)
+    def on_chain_end(self, outputs, *, run_id=None, **kwargs):
+        node = self._owners.pop(run_id, None)
+        if not node:
+            return
+        depth = self._depth.get(node, 1) - 1
+        if depth <= 0:
+            self._depth.pop(node, None)
             self._emit("node.finished", {"node": node})
+        else:
+            self._depth[node] = depth
 
 
 def _job_overrides(job: dict) -> dict:

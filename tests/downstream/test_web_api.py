@@ -188,3 +188,50 @@ def test_each_page_has_exactly_one_script_block(client, tmp_path):
         conn.close()
 
     assert client.get(f"/runs/{run_id}", headers=AUTH).text.count("<script") == 1
+
+
+def test_the_report_route_serves_the_html_sibling_not_the_markdown(client, tmp_path):
+    """The kernel returns complete_report.md and writes the .html beside it."""
+    report_dir = tmp_path / "report"
+    report_dir.mkdir()
+    (report_dir / "complete_report.md").write_text("# plain markdown", encoding="utf-8")
+    (report_dir / "complete_report.html").write_text(
+        "<!doctype html><html><body><h1>600519.SH</h1></body></html>", encoding="utf-8")
+
+    conn = db.connect(tmp_path / "state.db")
+    try:
+        run_id = jobs.create(conn, symbol="600519.SH", market="CN", profile="CN_A_SHARE",
+                             trade_date="2026-10-30", analysts=["market"], language="中文",
+                             strict=False, portfolio_json=None)
+        jobs.finish(conn, run_id, rating="Hold", run_dir=str(tmp_path),
+                    report_path=str(report_dir / "complete_report.md"))
+    finally:
+        conn.close()
+
+    response = client.get(f"/runs/{run_id}/report", headers=AUTH)
+
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("text/html")
+    assert "<!doctype html>" in response.text
+    assert "plain markdown" not in response.text
+
+
+def test_a_markdown_only_report_is_served_as_plain_text(client, tmp_path):
+    report_dir = tmp_path / "report"
+    report_dir.mkdir()
+    (report_dir / "complete_report.md").write_text("# plain markdown", encoding="utf-8")
+
+    conn = db.connect(tmp_path / "state.db")
+    try:
+        run_id = jobs.create(conn, symbol="600519.SH", market="CN", profile="CN_A_SHARE",
+                             trade_date="2026-10-30", analysts=["market"], language="中文",
+                             strict=False, portfolio_json=None)
+        jobs.finish(conn, run_id, rating="Hold", run_dir=str(tmp_path),
+                    report_path=str(report_dir / "complete_report.md"))
+    finally:
+        conn.close()
+
+    response = client.get(f"/runs/{run_id}/report", headers=AUTH)
+
+    assert response.headers["content-type"].startswith("text/plain")
+    assert response.text == "# plain markdown"

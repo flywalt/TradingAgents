@@ -48,6 +48,23 @@ RATING_LABELS = {
 }
 
 
+def served_report(path: Path) -> tuple[Path, str]:
+    """Pick the file to hand the browser, and the type to declare for it.
+
+    ``write_report_tree`` returns the complete *markdown* path — that is the
+    canonical artifact — while writing a self-contained HTML page beside it.
+    Serving the markdown as ``text/html`` renders it as one unformatted block,
+    so prefer the HTML sibling and fall back to plain text, never claiming HTML
+    for a file that is not.
+    """
+    if path.suffix != ".html":
+        sibling = path.with_suffix(".html")
+        if sibling.is_file():
+            return sibling, "text/html"
+        return path, "text/plain; charset=utf-8"
+    return path, "text/html"
+
+
 class RunRequest(BaseModel):
     symbol: str = Field(min_length=1, max_length=20)
     date: str
@@ -348,10 +365,12 @@ def create_app(
         path = Path(job["report_path"])
         if not path.is_file():
             raise HTTPException(status_code=404, detail="report missing on disk")
-        return FileResponse(path, media_type="text/html", headers={
-            "Content-Security-Policy": "sandbox; default-src 'none'; style-src 'unsafe-inline'",
-            "X-Content-Type-Options": "nosniff",
-        })
+        served, media_type = served_report(path)
+        headers = {"X-Content-Type-Options": "nosniff"}
+        if media_type == "text/html":
+            headers["Content-Security-Policy"] = (
+                "sandbox; default-src 'none'; style-src 'unsafe-inline'")
+        return FileResponse(served, media_type=media_type, headers=headers)
 
     @app.get("/runs/{run_id}/files/{name}", dependencies=[Depends(require_read)])
     def file(run_id: str, name: str, session=Depends(_conn)):  # noqa: B008
