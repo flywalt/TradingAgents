@@ -156,11 +156,8 @@ def test_the_full_decision_section_survives_the_summary():
 
 
 def test_a_report_without_a_decision_gets_no_summary_card():
-    html = SAMPLE.replace('<section id="s5"><h2>V. Portfolio Manager Decision</h2>'
-                          '<h3 id="s5-1">Portfolio Manager</h3>'
-                          '<p>维持当前配置，重点放在确定性更高的品种上。</p>'
-                          '<p>组合在本周没有需要立即执行的调整；风险预算保持不变。</p>'
-                          '<p>第三段不应出现在摘要里。</p></section>', "")
+    start = SAMPLE.index('<section id="s5">')
+    html = SAMPLE[:start] + SAMPLE[SAMPLE.index("</section>", start) + len("</section>"):]
 
     out = report_page.present(html, "中文")
 

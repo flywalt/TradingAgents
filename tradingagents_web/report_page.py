@@ -14,6 +14,7 @@ sentence that happens to contain the word "Generated" survives untouched.
 from __future__ import annotations
 
 import re
+from html import escape
 
 from .labels import RATING_LABELS, REPORT_SECTION_LABELS
 
