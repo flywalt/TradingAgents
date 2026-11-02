@@ -107,3 +107,24 @@ def test_the_markup_we_match_is_still_produced_upstream():
     html = _upstream_report()
     for marker in report_page.UPSTREAM_MARKERS:
         assert marker in html, marker
+
+
+def test_a_chinese_report_gets_cjk_typography():
+    out = report_page.present(SAMPLE, "中文")
+
+    assert out.count('<style id="ta-cn">') == 1
+    assert out.index('<style id="ta-cn">') < out.index("</head>")
+    style = out[out.index('<style id="ta-cn">'):out.index("</style>", out.index('<style id="ta-cn">'))]
+    assert "Noto Serif CJK SC" in style
+    assert "--serif:" in style and "--sans:" in style
+    assert "17px/1.85" in style
+
+
+def test_an_english_report_gets_no_injected_style():
+    assert "ta-cn" not in report_page.present(SAMPLE, "English")
+
+
+def test_present_is_idempotent():
+    once = report_page.present(SAMPLE, "中文")
+
+    assert report_page.present(once, "中文") == once

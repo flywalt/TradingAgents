@@ -52,6 +52,21 @@ _NUMERALS = {"I": "一", "II": "二", "III": "三", "IV": "四", "V": "五"}
 
 _RATING_SPAN = re.compile(r'<span class="rating ([a-z]+)">([A-Za-z]+)</span>')
 
+#: Upstream sets the report in Charter/Georgia at 17px/1.62 and never names a
+#: CJK family, so Chinese body text falls to whatever the browser defaults to
+#: and sits too tight. This override only names fallbacks and re-spaces the
+#: line; colour, dark mode and print all keep using upstream's variables.
+_CN_STYLE = """<style id="ta-cn">
+:root {
+  --serif: Charter, "Bitstream Charter", "Sitka Text", Cambria, Georgia,
+    "Noto Serif CJK SC", "Source Han Serif SC", "Source Han Serif CN",
+    "Songti SC", "STSong", SimSun, serif;
+  --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial,
+    "PingFang SC", "Hiragino Sans GB", "Noto Sans CJK SC", "Microsoft YaHei", sans-serif;
+}
+body { font: 17px/1.85 var(--serif); }
+</style>"""
+
 
 def _is_chinese(language: str | None) -> bool:
     if not language:
@@ -102,4 +117,7 @@ def present(html: str, language: str | None) -> str:
         return html
     for old, new in _replacements():
         html = html.replace(old, new)
-    return _RATING_SPAN.sub(_localise_rating, html)
+    html = _RATING_SPAN.sub(_localise_rating, html)
+    if '<style id="ta-cn">' not in html:
+        html = html.replace("</head>", _CN_STYLE + "\n</head>", 1)
+    return html
