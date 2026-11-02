@@ -143,7 +143,7 @@ def test_the_analyst_column_sits_on_the_spine(analysts):
                if box["id"].startswith("analyst-")]
     column_centre = (min(centres) + max(centres)) / 2
     assert abs(column_centre - spine) <= 1, (analysts, column_centre, spine)
-    assert width_px == 1300                       # one screen wide, not tall
+    assert width_px == 1310                       # one screen wide, not tall
 
 
 def test_wide_the_debate_stage_speaks_with_one_line():
@@ -214,3 +214,44 @@ def test_the_input_stage_hands_over_with_one_line(width):
     else:
         assert d == (f"M {source['x'] + source['w'] / 2:g} "
                      f"{source['y'] + source['h']:g} V {target['y']:g}")
+
+
+@pytest.mark.parametrize("width", ["wide", "narrow"])
+def test_every_stage_sits_the_same_distance_from_its_neighbour(width):
+    """Equal hand-offs: the gap between consecutive stages is one measure."""
+    layout = progress_graph.topology(ALL)[width]
+    boxes = _boxes(layout)
+    groups = {g["id"]: g for g in layout["groups"]}
+    horizontal = width == "wide"
+
+    def edge_of(target):
+        if target in boxes:
+            box = boxes[target]
+            return box["x"] if horizontal else box["y"]
+        group = groups[target]
+        return group["x"] if horizontal else group["y"]
+
+    def far_edge(target):
+        if target in boxes:
+            box = boxes[target]
+            return box["x"] + box["w"] if horizontal else box["y"] + box["h"]
+        group = groups[target]
+        return group["x"] + group["w"] if horizontal else group["y"] + group["h"]
+
+    chain = ["input", "research", "research-manager", "trader", "risk", "portfolio"]
+    gaps = [round(edge_of(b) - far_edge(a)) for a, b in zip(chain, chain[1:])]
+    assert gaps == [48] * 5 if horizontal else gaps == [24] * 5
+
+
+@pytest.mark.parametrize("width", ["wide", "narrow"])
+def test_a_groups_cards_are_centred_in_their_frame(width):
+    """The cards sit in the middle of their container, not hugging one side."""
+    layout = progress_graph.topology(ALL)[width]
+    boxes = _boxes(layout)
+
+    for group in layout["groups"]:
+        members = [boxes[m] for m in group["members"]]
+        lefts = min(b["x"] for b in members)
+        rights = max(b["x"] + b["w"] for b in members)
+        assert abs((lefts + rights) / 2 - (group["x"] + group["w"] / 2)) <= 1, \
+            (width, group["id"])
