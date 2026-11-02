@@ -968,9 +968,6 @@ input[type="checkbox"] {
   stroke-linecap: round;
 }
 
-.graph .edge--debate { stroke-dasharray: 3 4; }
-.graph .edge--bypass { stroke-dasharray: 2 5; stroke: color-mix(in oklab, var(--color-muted) 60%, transparent); }
-
 .graph .edge.is-flowing {
   stroke: var(--color-cool);
   stroke-width: 1.6;
