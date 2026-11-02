@@ -154,12 +154,14 @@
       var from = stateOf(path.dataset.from);
       var to = stateOf(path.dataset.to);
       var classes = ['edge', 'edge--' + path.dataset.kind];
-      handOff(path, from, to);
+      // a flowing hand-off is sticky across repaints; its own timer ends it
+      if (path.classList.contains('is-flowing')) classes.push('is-flowing');
       if (state.debate && state.debate.indexOf(path.dataset.from) >= 0 &&
           state.debate.indexOf(path.dataset.to) >= 0) {
         classes.push('is-debate');
       }
       path.setAttribute('class', classes.join(' '));
+      handOff(path, from, to);   // after the repaint, so its class survives
     });
     if (roundNote) {
       var parts = [];
