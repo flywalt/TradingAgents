@@ -201,7 +201,7 @@ def create_app(
     async def http_exception(request: Request, exc: HTTPException):
         if exc.status_code != 401 or "text/html" not in request.headers.get("accept", ""):
             return JSONResponse({"detail": exc.detail}, status_code=exc.status_code)
-        return HTMLResponse(f"""<!doctype html>
+        return HTMLResponse("""<!doctype html>
 <html lang="zh"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>登录 · TradingAgents CN</title>
