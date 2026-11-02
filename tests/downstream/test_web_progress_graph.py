@@ -106,3 +106,88 @@ def test_the_analyst_row_is_centred_on_the_debate_entry(analysts):
 
     row_centre = (min(centres) + max(centres)) / 2
     assert abs(row_centre - bull_centre) <= 1, (analysts, row_centre, bull_centre)
+
+
+ALL_IDS = {"analyst-market", "analyst-social", "analyst-news", "analyst-fundamentals",
+           "memory", "bull", "bear", "research-manager", "trader",
+           "risk-aggressive", "risk-conservative", "risk-neutral", "portfolio"}
+
+
+@pytest.mark.parametrize("width", ["wide", "narrow"])
+def test_the_three_groups_exist_and_carry_their_members(width):
+    layout = progress_graph.topology(ALL)[width]
+    groups = {g["id"]: g for g in layout["groups"]}
+    boxes = _boxes(layout)
+
+    assert {"input", "research", "risk"} <= set(groups)
+    assert groups["research"]["label"] == "研究辩论"
+    for member in ("bull", "bear"):
+        assert member in groups["research"]["members"]
+    for member in ("risk-aggressive", "risk-conservative", "risk-neutral"):
+        assert member in groups["risk"]["members"]
+
+
+@pytest.mark.parametrize("width", ["wide", "narrow"])
+def test_every_member_sits_inside_its_group(width):
+    layout = progress_graph.topology(ALL)[width]
+    boxes = _boxes(layout)
+
+    for group in layout["groups"]:
+        for member in group["members"]:
+            box = boxes[member]
+            assert box["x"] >= group["x"] and box["y"] >= group["y"], (member, "nw")
+            assert box["x"] + box["w"] <= group["x"] + group["w"], (member, "e")
+            assert box["y"] + box["h"] <= group["y"] + group["h"], (member, "s")
+
+
+@pytest.mark.parametrize("width", ["wide", "narrow"])
+def test_groups_do_not_overlap_each_other(width):
+    layout = progress_graph.topology(ALL)[width]
+
+    for i, a in enumerate(layout["groups"]):
+        for b in layout["groups"][i + 1:]:
+            separated = (a["x"] + a["w"] <= b["x"] or b["x"] + b["w"] <= a["x"]
+                         or a["y"] + a["h"] <= b["y"] or b["y"] + b["h"] <= a["y"])
+            assert separated, (a["id"], b["id"])
+
+
+@pytest.mark.parametrize("width", ["wide", "narrow"])
+def test_the_analyst_fan_converges_through_one_shared_bus(width):
+    """Every analyst's line drops onto the same horizontal and enters bull once."""
+    layout = progress_graph.topology(ALL)[width]
+    boxes = _boxes(layout)
+    bull = boxes["bull"]
+    edges = [e for e in layout["edges"] if e["to"] == "bull" and e["kind"] == "flow"]
+
+    assert len(edges) == 4
+    ends = set()
+    for edge in edges:
+        # last vertical run lands on bull's top edge
+        tail = edge["d"].rsplit("V ", 1)[1]
+        ends.add(tail)
+        assert f"V {tail}" in edge["d"]
+        assert float(tail) == bull["y"], tail
+    assert len(ends) == 1
+    # the entry x is bull's centre: the bus meets the box where its port is
+    centre = f"{bull['x'] + bull['w'] / 2:g}"
+    assert all(f"H {centre}" in e["d"] for e in edges)
+
+
+@pytest.mark.parametrize("width", ["wide", "narrow"])
+def test_vertical_flow_edges_leave_from_the_bottom_centre(width):
+    """Fixed ports: a flow edge starts where its source box ends."""
+    layout = progress_graph.topology(ALL)[width]
+    boxes = _boxes(layout)
+
+    for edge in layout["edges"]:
+        if edge["kind"] != "flow" or edge["from"].startswith("analyst-"):
+            continue
+        src = boxes[edge["from"]]
+        head = edge["d"].split(" ")[0:3]
+        assert head[0] == "M"
+        x1, y1 = float(head[1]), float(head[2])
+        # fixed ports: bottom-centre by default; a box whose bottom port is
+        # blocked (memory sits under the neutral) may exit right-centre
+        bottom = (x1 == src["x"] + src["w"] / 2 and y1 == src["y"] + src["h"])
+        right = (y1 == src["y"] + src["h"] / 2 and x1 == src["x"] + src["w"])
+        assert bottom or right, (edge["from"], head)
