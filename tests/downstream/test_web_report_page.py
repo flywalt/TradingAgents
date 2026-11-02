@@ -21,9 +21,12 @@ SAMPLE = """<!doctype html>
 <dl class="run"><div><dt>Generated</dt><dd>2026-11-02 13:22</dd></div>
 <div><dt>Debate rounds</dt><dd>1</dd></div></dl></header>
 <nav class="contents" aria-label="Sections"><ul><li><a href="#s1"><span class="num">I</span>
-<span class="label">Analyst Team Reports</span></a></li></ul></nav>
-<main><section id="s1"><h2>I. Analyst Team Reports</h2><h3>Market Analyst</h3>
-<p>正文中的 Generated、Analysts 这些词不该被翻译。</p></section>
+<span class="label">Analyst Team Reports</span></a><ul><li><a href="#s1-1"><span class="label">Market Analyst</span></a></li></ul></li></ul></nav>
+<main><section id="s1"><h2>I. Analyst Team Reports</h2><h3 id="s1-1">Market Analyst</h3>
+<p><strong>Rating</strong>: HOLD，<strong>Executive Summary</strong> 见下；<strong>HOLD</strong> 与 <strong>BUY</strong> 均为内核枚举。
+正文中的 Generated、Analysts 这些词不该被翻译。</p>
+<div class="table"><table><tr><th>K</th></tr><tr><td><span class="name">Prices</span></td></tr></table></div>
+</section>
 <section id="s5"><h2>V. Portfolio Manager Decision</h2><h3 id="s5-1">Portfolio Manager</h3>
 <p>维持当前配置，重点放在确定性更高的品种上。</p>
 <p>组合在本周没有需要立即执行的调整；风险预算保持不变。</p>
@@ -59,7 +62,7 @@ def test_the_report_body_is_never_touched():
     out = report_page.present(SAMPLE, "中文")
 
     assert "正文中的 Generated、Analysts 这些词不该被翻译。" in out
-    assert "<h3>Market Analyst</h3>" in out
+    assert '<h3 id="s1-1">市场分析师</h3>' in out   # agent name follows the glossary
 
 
 def test_an_english_run_is_returned_unchanged():
@@ -71,8 +74,7 @@ def test_a_report_without_a_rating_is_left_alone():
     html = SAMPLE.replace(' <span class="rating level">Hold</span>', "")
 
     out = report_page.present(html, "中文")
-
-    assert "中性" not in out
+    assert 'class="rating' not in out   # the masthead badge is gone with the rating
     assert '<h1><span class="ticker">600519.SH</span></h1>' in out
 
 
@@ -165,3 +167,38 @@ def test_a_report_without_a_decision_gets_no_summary_card():
 
     assert 'class="ta-summary"' not in out   # the stylesheet may still be there
     assert "核心结论" not in out
+
+
+def test_agent_names_are_translated_where_the_kernel_names_them():
+    """The h3 headings and the contents rail repeat the kernel's node names."""
+    out = report_page.present(SAMPLE, "中文")
+
+    assert '<h3 id="s1-1">市场分析师</h3>' in out          # id keeps its anchor
+    assert '<span class="label">市场分析师</span>' in out   # the rail too
+    assert "Market Analyst" not in out
+
+
+def test_kernel_enums_and_labels_are_translated_inside_strong():
+    out = report_page.present(SAMPLE, "中文")
+
+    assert "<strong>评级</strong>: 中性（HOLD）" in out
+    assert "<strong>执行摘要</strong>" in out
+    assert "<strong>中性（HOLD）</strong>" in out
+    assert "<strong>乐观（BUY）</strong>" in out
+    # prose outside <strong> is never touched
+    assert "均为内核枚举" in out
+
+
+def test_data_vendor_groups_are_translated():
+    out = report_page.present(SAMPLE, "中文")
+
+    assert '<span class="name">行情</span>' in out
+    assert '<span class="name">Prices</span>' not in out
+
+
+def test_the_typography_scale_is_declared_for_chinese():
+    out = report_page.present(SAMPLE, "中文")
+
+    style = out[out.index('<style id="ta-cn">'):out.index("</style>")]
+    assert "main h2" in style and "1.5rem" in style      # 一、 chapters lead
+    assert "main h4" in style                            # markdown sub-heads below
