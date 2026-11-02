@@ -21,7 +21,6 @@ from tradingagents.agents import (
     create_fundamentals_analyst,
     create_market_analyst,
     create_neutral_debator,
-    create_news_analyst,
     create_portfolio_manager,
     create_research_manager,
     create_trader,
@@ -29,6 +28,7 @@ from tradingagents.agents import (
 from tradingagents.agents.state import AgentState
 from tradingagents.graph.analyst_execution import build_analyst_execution_plan
 from tradingagents.graph.setup import DEBATE_PATH_MAP, RISK_ANALYSIS_PATH_MAP, _analyst_graph
+from tradingagents_cn.agents.news_analyst import create_news_analyst
 from tradingagents_cn.agents.sentiment_analyst import create_sentiment_analyst
 
 

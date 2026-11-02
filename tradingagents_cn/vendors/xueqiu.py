@@ -58,6 +58,11 @@ def fetch_stock_items(symbol: str, kind: str, start_date: str, end_date: str) ->
     return parse_items(xml_text, start, end)
 
 
+def fetch_stock_announcements(symbol: str, start_date: str, end_date: str) -> list[dict]:
+    """Per-stock announcements (title + PDF link), window-filtered."""
+    return fetch_stock_items(symbol, "announcement", start_date, end_date)
+
+
 def fetch_stock_comments(symbol: str, start_date: str, end_date: str) -> list[dict]:
     code = xueqiu_code(symbol)
     start, end = _window(start_date, end_date)
@@ -105,7 +110,7 @@ def get_news(ticker: str, start_date: str, end_date: str) -> str:
 def get_announcements(ticker: str, start_date: str, end_date: str) -> str:
     """Exchange announcements for an A-share symbol (not routed yet)."""
     canonical = require_ashare(ticker)
-    items = fetch_stock_items(canonical, "announcement", start_date, end_date)
+    items = fetch_stock_announcements(canonical, start_date, end_date)
     if not items:
         raise no_rows(ticker, canonical,
                       f"xueqiu returned no announcements between {start_date} and {end_date}")

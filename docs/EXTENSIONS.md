@@ -75,6 +75,8 @@
 | `tradingagents_cn/vendors/rsshub.py` | RSSHub 公共层：`?key=` 鉴权、RSS 解析、日期窗口、HTML 清洗 |
 | `tradingagents_cn/vendors/cls.py` | 财联社电报：7 分类 + 全市场雷达、公司事件流按代码提取聚合 |
 | `tradingagents_cn/agents/sentiment_analyst.py` | A 股情绪分析师：雪球评论/帖子/热帖 + 路由新闻，结构化 `SentimentReport` |
+| `tradingagents_cn/agents/news_analyst.py` | A 股新闻分析师：上游四工具 + 预取 CLS 公司事件与雪球公告 |
+| `tradingagents_cn/agents/blocks.py` | 分析师共用的 prompt 数据块（限长、显式 UNAVAILABLE） |
 | `tradingagents_cn/graph/wiring.py` | 用下游情绪节点重建 CN 图（复用上游节点工厂与分析师子图） |
 | `tradingagents_cn/vendors/tushare/flows.py` | 资金流/北向/两融/龙虎榜（仅接口） |
 | `tradingagents_cn/vendors/tushare/index.py` | 指数行情与成分权重（独立命名空间） |
@@ -103,6 +105,7 @@
 | `tests/downstream/test_cls.py` | CLS 代码提取/窗口/公司过滤/拒绝语义 |
 | `tests/downstream/test_cls_live.py` | **真实 CLS 流**：代码覆盖率 ≥70% + 雷达非空 |
 | `tests/downstream/test_cn_sentiment_agent.py` | 雪球数据入 prompt、源失败显式降级、CN 图使用下游工厂 |
+| `tests/downstream/test_cn_news_agent.py` | CLS/公告入 prompt、失败降级、CN 图使用下游工厂 |
 | `tests/downstream/test_web_jobs.py` | 队位、崩溃恢复、事件序号 |
 | `tests/downstream/test_web_errors.py` | 错误分类 |
 | `tests/downstream/test_web_security.py` | token 比较、路径白名单 |
