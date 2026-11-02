@@ -34,6 +34,7 @@
    * the words live in one place (labels.py) instead of in this file. */
   var nodeLabels = {};
   var toGraphId = {};
+  var groupMembers = {};   // group id -> member node ids (entries end on groups)
   ['wide', 'narrow'].forEach(function (name) {
     if (!data) return;
     data[name].nodes.forEach(function (node) {
@@ -54,8 +55,18 @@
     return node;
   }
 
+  function defs() {
+    var d = element('defs', {});
+    var marker = element('marker', {id: 'ta-arrow', viewBox: '0 0 10 10', refX: 9,
+                                    refY: 5, markerWidth: 6, markerHeight: 6,
+                                    orient: 'auto-start-reverse'});
+    marker.appendChild(element('path', {d: 'M 0 0 L 10 5 L 0 10 z'}));
+    d.appendChild(marker);
+    return d;
+  }
+
   function currentLayout() {
-    return window.matchMedia('(min-width: 720px)').matches ? 'wide' : 'narrow';
+    return window.matchMedia('(min-width: 1000px)').matches ? 'wide' : 'narrow';
   }
 
   function draw() {
@@ -64,11 +75,35 @@
     var layout = data[layoutName];
     svg.setAttribute('viewBox', layout.viewBox);
     while (svg.firstChild) svg.removeChild(svg.firstChild);
+    svg.appendChild(defs());
+
+    // Groups sit behind everything: they say which boxes belong together,
+    // they are not stages of their own.
+    (layout.groups || []).forEach(function (group) {
+      var g = element('g', {'class': 'ta-group', 'data-group': group.id});
+      g.appendChild(element('rect', {x: group.x, y: group.y, width: group.w,
+                                     height: group.h, rx: 8}));
+      var label = element('text', {x: group.x + 12, y: group.y + 17});
+      label.textContent = group.label;
+      g.appendChild(label);
+      svg.appendChild(g);
+    });
 
     layout.edges.forEach(function (edge) {
-      svg.appendChild(element('path', {
-        d: edge.d, 'data-from': edge.from, 'data-to': edge.to, 'data-kind': edge.kind
-      }));
+      var attrs = {d: edge.d, 'data-from': edge.from, 'data-to': edge.to,
+                   'data-kind': edge.kind};
+      if (edge.kind === 'debate') {
+        // A debate is two people facing each other, not a hand-off: arrows on
+        // both ends, and never the dashed "transfer" language.
+        attrs['marker-start'] = 'url(#ta-arrow)';
+        attrs['marker-end'] = 'url(#ta-arrow)';
+      }
+      svg.appendChild(element('path', attrs));
+    });
+
+    groupMembers = {};
+    (layout.groups || []).forEach(function (group) {
+      groupMembers[group.id] = group.members;
     });
 
     layout.nodes.forEach(function (node) {
@@ -84,22 +119,50 @@
     paint();
   }
 
+  /* An edge may end on a group container: the run joins the debate stage, not
+   * one debater. A group is active while any member works, done when all have. */
+  function stateOf(id) {
+    if (state.nodes[id]) return state.nodes[id];
+    var members = groupMembers[id];
+    if (!members) return 'idle';
+    if (members.some(function (m) { return state.nodes[m] === 'active'; })) return 'active';
+    if (members.every(function (m) { return state.nodes[m] === 'done'; })) return 'done';
+    return 'idle';
+  }
+
+  /* A hand-off is an event, not a state: the line flows once, briefly, when
+   * the finished stage hands its work to the next one - then it is the next
+   * stage's business, and a debate running for rounds must not keep the wire
+   * flashing the whole time. Each wire flows at most once per run. */
+  var flowed = {};
+
+  function handOff(path, from, to) {
+    if (path.dataset.kind !== 'flow') return;   // debates have their own motion
+    if (to !== 'active' || from !== 'done') return;
+    var key = path.dataset.from + '>' + path.dataset.to;
+    if (flowed[key]) return;
+    flowed[key] = true;
+    path.classList.add('is-flowing');
+    setTimeout(function () { path.classList.remove('is-flowing'); }, 2400);
+  }
+
   function paint() {
     if (!svg) return;
     Array.prototype.forEach.call(svg.querySelectorAll('[data-node]'), function (group) {
       group.setAttribute('class', 'node node--' + (state.nodes[group.dataset.node] || 'idle'));
     });
     Array.prototype.forEach.call(svg.querySelectorAll('[data-kind]'), function (path) {
-      var from = state.nodes[path.dataset.from] || 'idle';
-      var to = state.nodes[path.dataset.to] || 'idle';
+      var from = stateOf(path.dataset.from);
+      var to = stateOf(path.dataset.to);
       var classes = ['edge', 'edge--' + path.dataset.kind];
-      // A hand-off is live while the next node works and the previous one is done.
-      if (to === 'active' && from === 'done') classes.push('is-flowing');
+      // a flowing hand-off is sticky across repaints; its own timer ends it
+      if (path.classList.contains('is-flowing')) classes.push('is-flowing');
       if (state.debate && state.debate.indexOf(path.dataset.from) >= 0 &&
           state.debate.indexOf(path.dataset.to) >= 0) {
         classes.push('is-debate');
       }
       path.setAttribute('class', classes.join(' '));
+      handOff(path, from, to);   // after the repaint, so its class survives
     });
     if (roundNote) {
       var parts = [];

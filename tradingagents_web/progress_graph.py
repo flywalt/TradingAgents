@@ -1,13 +1,27 @@
-"""The run drawn as a graph: topology and both layouts, computed in Python.
+"""The run drawn as a graph: topology, groups and both layouts, in Python.
 
 Layout lives here rather than in the browser so it can be tested: nodes must not
-overlap, must stay inside the canvas, and every edge must join two nodes that
-exist. ``static/run-page.js`` only paints this and lights it from the recorded
-events.
+overlap, must stay inside the canvas and their group, and every edge must join
+two known targets (nodes or groups) through fixed ports.
+
+Drawing grammar (what the viewer can rely on):
+
+- one vertical spine per layout; every stage's boxes share a row and a baseline;
+- flows leave a box at its bottom-centre and enter the target's top, through
+  declared offsets — never "near" a box, always on its edge;
+- the analysts' fan gathers on a shared bus and enters the research debate
+  through the group's top-centre port: the run joins the *stage*, not one
+  debater (the kernel starts the debate with the bull, which the events show);
+- debates are solid double-headed amber lines. The risk trio is drawn as a
+  closed triangle — three equal peers, each side an edge of the loop — so the
+  cycle needs no return arc threading the main flow;
+- the memory log is a feedback node in both layouts: outside the input group,
+  beside the portfolio it feeds, connected only by a dotted line routed along
+  the canvas margin.
 
 Two layouts exist because the shape does not survive a 360px column: wide puts
-the analysts in one row, narrow stacks the spine and keeps only the two debate
-pairs side by side.
+the analysts in one row, narrow stacks the spine and keeps the debate pairs side
+by side.
 """
 
 from __future__ import annotations
@@ -40,51 +54,71 @@ _CORE = (
 )
 
 _WIDE = {
-    "viewBox": "0 0 960 640",
+    # Horizontal: the stages hand over left to right, each stage's boxes stack
+    # vertically (the risk trio keeps its triangle). One screen, one line of
+    # travel, and one measure between stages so the hand-offs read as equals.
+    "viewBox": "0 0 1310 430",
+    "orient": "h",
     "height": 48,
-    "analyst_y": 48,
-    "analyst_width": 150,
-    # No fixed analyst_x: the row is computed per selection (see _analyst_row)
-    # so its centre always sits on the debate entry, whatever is selected.
-    "analyst_gap": 26,
-    "default_width": 150,
+    "analyst_x": 20,
+    "analyst_width": 130,
+    "analyst_gap": 16,
+    "spine_y": 215.0,
+    "stage_gap": 48,
     "boxes": {
-        "memory": (760, 48),
-        "bull": (280, 168),
-        "bear": (530, 168),
-        "research-manager": (405, 272),
-        "trader": (405, 368),
-        "risk-aggressive": (150, 464),
-        "risk-conservative": (405, 464),
-        "risk-neutral": (660, 464),
-        "portfolio": (405, 560),
+        "memory": (1158, 300, 140),
+        "bull": (226, 152, 150),
+        "bear": (226, 230, 150),
+        "research-manager": (438, 191, 140),
+        "trader": (626, 191, 140),
+        "risk-aggressive": (828, 120, 120),
+        "risk-conservative": (828, 262, 120),
+        "risk-neutral": (978, 191, 120),
+        "portfolio": (1158, 191, 140),
     },
-    "bypass_x": 944,
-    "cycle_drop": 36,
+    # Every group carries the same frame: 26 above the label band, 26 below
+    # the last card - and each stage sits the same 48 from its neighbours.
+    "groups": [
+        {"id": "input", "label": "输入", "members": "analysts",
+         "x": 6, "y": 69, "w": 158, "h": 292},
+        {"id": "research", "label": "研究辩论", "members": ["bull", "bear"],
+         "x": 212, "y": 126, "w": 178, "h": 178},
+        {"id": "risk", "label": "风险辩论 · 循环", "members":
+            ["risk-aggressive", "risk-conservative", "risk-neutral"],
+         "x": 814, "y": 94, "w": 296, "h": 242},
+    ],
 }
 
 _NARROW = {
-    "viewBox": "0 0 360 520",
-    "height": 40,
-    "analyst_y": 20,
-    "analyst_width": 78,
-    "analyst_x": {"market": 12, "social": 99, "news": 186, "fundamentals": 273},
-    "default_width": 200,
+    "viewBox": "0 0 360 910",
+    "height": 44,
+    "analyst_y": 50,
+    "analyst_width": 240,
+    "analyst_x": 60,
+    "analyst_gap": 16,
+    "default_width": 240,
+    "stage_gap": 24,
+    "margin_x": 8.0,
     "boxes": {
-        "memory": (80, 392),
-        "bull": (20, 100),
-        "bear": (190, 100),
-        "research-manager": (80, 176),
-        "trader": (80, 248),
-        "risk-aggressive": (20, 320),
-        "risk-conservative": (130, 320),
-        "risk-neutral": (240, 320),
-        "portfolio": (80, 464),
+        "memory": (60, 848),
+        "bull": (20, 350, 150),
+        "bear": (190, 350, 150),
+        "research-manager": (60, 444),
+        "trader": (60, 512),
+        "risk-aggressive": (45, 606, 100),
+        "risk-conservative": (215, 606, 100),
+        "risk-neutral": (130, 686, 100),
+        "portfolio": (60, 780),
     },
-    "widths": {"bull": 150, "bear": 150,
-               "risk-aggressive": 100, "risk-conservative": 100, "risk-neutral": 100},
-    "bypass_x": 8,
-    "cycle_drop": 16,
+    "groups": [
+        {"id": "input", "label": "输入", "members": "analysts",
+         "x": 48, "y": 24, "w": 264, "h": 276},
+        {"id": "research", "label": "研究辩论", "members": ["bull", "bear"],
+         "x": 6, "y": 324, "w": 348, "h": 96},
+        {"id": "risk", "label": "风险辩论 · 循环", "members":
+            ["risk-aggressive", "risk-conservative", "risk-neutral"],
+         "x": 8, "y": 580, "w": 344, "h": 176},
+    ],
 }
 
 
@@ -92,40 +126,23 @@ def _n(value: float) -> str:
     return f"{value:g}"
 
 
-def _analyst_row(spec: dict, analysts: list[str]) -> list[tuple[str, int]]:
-    """The selected analysts' (key, x) pairs, centred on bull in the wide layout.
+def _analyst_row(spec: dict, analysts: list[str]) -> list[tuple[str, int, int]]:
+    """The selected analysts' (key, x, y) triples for this layout.
 
-    A fixed row would sit lopsided over the debate entry whenever fewer than
-    all four analysts are selected — and even with all four, the gather reads
-    symmetric only if the row's centre meets the node it feeds.
+    Wide stacks them centred on the horizontal spine whatever the selection;
+    narrow stacks its fixed column the same way. A lone analyst sits on the
+    spine either way.
     """
     selected = [key for key in ANALYST_ORDER if key in analysts]
-    if "analyst_x" in spec:                      # narrow keeps its fixed row
-        return [(key, spec["analyst_x"][key]) for key in selected]
-    width = spec["analyst_width"]
-    total = len(selected) * width + (len(selected) - 1) * spec["analyst_gap"]
-    bull = spec["boxes"]["bull"]
-    centre = bull[0] + spec["default_width"] / 2
-    start = round(centre - total / 2)
-    return [(key, start + index * (width + spec["analyst_gap"]))
+    step = spec["height"] + spec["analyst_gap"]
+    if spec.get("orient") == "h":                # wide: one column on the spine
+        start = round(spec["spine_y"] - (len(selected) * spec["height"]
+                                         + (len(selected) - 1) * spec["analyst_gap"]) / 2)
+        return [(key, spec["analyst_x"], start + index * step)
+                for index, key in enumerate(selected)]
+    # narrow: the same fixed column, stacked from the top
+    return [(key, spec["analyst_x"], spec["analyst_y"] + index * step)
             for index, key in enumerate(selected)]
-
-
-def _build_nodes(spec: dict, analysts: list[str]) -> list[dict]:
-    nodes = []
-    for key, x in _analyst_row(spec, analysts):
-        kernel = ANALYST_NODES[key]
-        nodes.append(_node(f"analyst-{key}", kernel, x, spec["analyst_y"],
-                           spec["analyst_width"], spec["height"]))
-    analyst_end = nodes[-1]["x"] + nodes[-1]["w"] if nodes else 0
-    for node_id, kernel in _CORE:
-        x, y = spec["boxes"][node_id]
-        if node_id == "memory" and "analyst_x" not in spec and nodes:
-            # right after the analyst row, one gap out
-            x = analyst_end + spec["analyst_gap"]
-        width = spec.get("widths", {}).get(node_id, spec["default_width"])
-        nodes.append(_node(node_id, kernel, x, y, width, spec["height"]))
-    return nodes
 
 
 def _node(node_id: str, kernel: str, x: int, y: int, width: int, height: int) -> dict:
@@ -135,12 +152,36 @@ def _node(node_id: str, kernel: str, x: int, y: int, width: int, height: int) ->
             "x": x, "y": y, "w": width, "h": height}
 
 
+def _build_nodes(spec: dict, analysts: list[str]) -> list[dict]:
+    nodes = []
+    for key, x, y in _analyst_row(spec, analysts):
+        kernel = ANALYST_NODES[key]
+        nodes.append(_node(f"analyst-{key}", kernel, x, y,
+                           spec["analyst_width"], spec["height"]))
+    for node_id, kernel in _CORE:
+        box = spec["boxes"][node_id]
+        x, y = box[0], box[1]
+        width = box[2] if len(box) > 2 else spec.get(
+            "widths", {}).get(node_id, spec["default_width"])
+        nodes.append(_node(node_id, kernel, x, y, width, spec["height"]))
+    return nodes
+
+
 def _centre_x(node: dict) -> float:
     return node["x"] + node["w"] / 2
 
 
+def _enter(src: dict, port_x: float, port_y: float, via_y: float | None) -> str:
+    """Leave the source's bottom port, gather at ``via_y``, enter ``port``."""
+    x1 = _centre_x(src)
+    y1 = src["y"] + src["h"]
+    if via_y is None or abs(port_x - x1) < 0.5:
+        return f"M {_n(x1)} {_n(y1)} V {_n(port_y)}"
+    return f"M {_n(x1)} {_n(y1)} V {_n(via_y)} H {_n(port_x)} V {_n(port_y)}"
+
+
 def _drop(src: dict, dst: dict, to_x: float | None = None) -> str:
-    """Down out of ``src``, across, and down into ``dst``."""
+    """Down out of ``src``'s bottom port, across, down into ``dst``'s top."""
     x1 = _centre_x(src)
     x2 = _centre_x(dst) if to_x is None else to_x
     y1 = src["y"] + src["h"]
@@ -154,64 +195,156 @@ def _across(src: dict, dst: dict) -> str:
     return f"M {_n(src['x'] + src['w'])} {_n(y)} H {_n(dst['x'])}"
 
 
-def _return_arc(src: dict, dst: dict, drop: int) -> str:
-    """Back under the row: the debate loop closing."""
-    y = src["y"] + src["h"] + drop
-    return (f"M {_n(_centre_x(src))} {_n(src['y'] + src['h'])} V {_n(y)} "
-            f"H {_n(_centre_x(dst))} V {_n(dst['y'] + dst['h'])}")
+def _edge_ports(box: dict) -> dict:
+    return {
+        "bottom": (_centre_x(box), box["y"] + box["h"]),
+        "top": (_centre_x(box), box["y"]),
+        "left": (box["x"], box["y"] + box["h"] / 2),
+        "right": (box["x"] + box["w"], box["y"] + box["h"] / 2),
+    }
 
 
-def _bypass(src: dict, dst: dict, margin: int) -> str:
-    """Out to the margin and down: the memory log only reaches the portfolio."""
+def _diagonal(src: dict, dst: dict, src_side: str, dst_side: str) -> str:
+    """Corner to corner across a triangle: anchors on both box edges."""
+    (x1, y1) = _edge_ports(src)[src_side]
+    (x2, y2) = _edge_ports(dst)[dst_side]
+    return f"M {_n(x1)} {_n(y1)} L {_n(x2)} {_n(y2)}"
+
+
+def _bypass(src: dict, dst: dict, margin: float) -> str:
+    """The memory log only reaches the portfolio.
+
+    Beside it (wide): a short dotted line straight across. Under it (narrow):
+    out to the canvas margin and around, clear of the main flow.
+    """
+    y1 = src["y"] + src["h"] / 2
+    y2 = dst["y"] + dst["h"] / 2
+    if abs(y1 - y2) < 1:
+        return f"M {_n(src['x'])} {_n(y1)} H {_n(dst['x'] + dst['w'])}"
     if margin < src["x"]:
         x1, x2 = src["x"], dst["x"]
     else:
         x1, x2 = src["x"] + src["w"], dst["x"] + dst["w"]
-    y1 = src["y"] + src["h"] / 2
-    y2 = dst["y"] + dst["h"] / 2
     return f"M {_n(x1)} {_n(y1)} H {_n(margin)} V {_n(y2)} H {_n(x2)}"
-
-
-def _edges(nodes: dict[str, dict], spec: dict) -> list[dict]:
-    edges = []
-    analysts = [node_id for node_id in nodes if node_id.startswith("analyst-")]
-    bull = nodes["bull"]
-    # Fan the analysts into the bull's top edge so their lines stay distinguishable.
-    for index, node_id in enumerate(analysts, start=1):
-        target = bull["x"] + bull["w"] * index / (len(analysts) + 1)
-        edges.append(_edge(node_id, "bull", "flow", _drop(nodes[node_id], bull, target)))
-    edges.append(_edge("bull", "bear", "debate", _across(bull, nodes["bear"])))
-    for source, target in (("bull", "research-manager"), ("bear", "research-manager")):
-        manager = nodes["research-manager"]
-        offset = 1 if source == "bull" else 2
-        to_x = manager["x"] + manager["w"] * offset / 3
-        edges.append(_edge(source, target, "flow", _drop(nodes[source], manager, to_x)))
-    edges.append(_edge("research-manager", "trader", "flow",
-                       _drop(nodes["research-manager"], nodes["trader"])))
-    edges.append(_edge("trader", "risk-aggressive", "flow",
-                       _drop(nodes["trader"], nodes["risk-aggressive"])))
-    edges.append(_edge("risk-aggressive", "risk-conservative", "debate",
-                       _across(nodes["risk-aggressive"], nodes["risk-conservative"])))
-    edges.append(_edge("risk-conservative", "risk-neutral", "debate",
-                       _across(nodes["risk-conservative"], nodes["risk-neutral"])))
-    edges.append(_edge("risk-neutral", "risk-aggressive", "debate",
-                       _return_arc(nodes["risk-neutral"], nodes["risk-aggressive"],
-                                   spec["cycle_drop"])))
-    edges.append(_edge("risk-neutral", "portfolio", "flow",
-                       _drop(nodes["risk-neutral"], nodes["portfolio"])))
-    edges.append(_edge("memory", "portfolio", "bypass",
-                       _bypass(nodes["memory"], nodes["portfolio"], spec["bypass_x"])))
-    return edges
 
 
 def _edge(source: str, target: str, kind: str, path: str) -> dict:
     return {"from": source, "to": target, "kind": kind, "d": path}
 
 
+def _edges(nodes: dict[str, dict], spec: dict) -> list[dict]:
+    groups = {g["id"]: g for g in spec["groups"]}
+    if spec.get("orient") == "h":
+        return _edges_horizontal(nodes, spec, groups)
+    return _edges_vertical(nodes, spec, groups)
+
+
+def _right_of(group_or_node: dict) -> float:
+    return group_or_node["x"] + group_or_node["w"]
+
+
+def _edges_horizontal(nodes: dict[str, dict], spec: dict, groups: dict) -> list[dict]:
+    """The wide picture: stages hand over left to right along one spine.
+
+    A stage speaks with one voice - its group - so each hand-off is a single
+    line from the group's edge, which is also the debate's merge.
+    """
+    edges = []
+    research, risk = groups["research"], groups["risk"]
+    spine = spec["spine_y"]
+
+    # one stage line: the input group as a whole hands over to the debate
+    # stage. Which analysts are working shows on their cards, not on the wire.
+    input_group = groups["input"]
+    edges.append(_edge("input", "research", "flow",
+                       f"M {_n(_right_of(input_group))} {_n(spine)} "
+                       f"H {_n(research['x'])}"))
+    edges.append(_edge("bull", "bear", "debate",
+                       f"M {_n(_centre_x(nodes['bull']))} {_n(nodes['bull']['y'] + nodes['bull']['h'])} "
+                       f"V {_n(nodes['bear']['y'])}"))
+    edges.append(_edge("research", "research-manager", "flow",
+                       f"M {_n(_right_of(research))} {_n(spine)} H {_n(nodes['research-manager']['x'])}"))
+    edges.append(_edge("research-manager", "trader", "flow",
+                       f"M {_n(_right_of(nodes['research-manager']))} {_n(spine)} "
+                       f"H {_n(nodes['trader']['x'])}"))
+    edges.append(_edge("trader", "risk", "flow",
+                       f"M {_n(_right_of(nodes['trader']))} {_n(spine)} H {_n(risk['x'])}"))
+    # the triangle: a level left side, two slopes to the apex
+    edges.append(_edge("risk-aggressive", "risk-conservative", "debate",
+                       f"M {_n(_centre_x(nodes['risk-aggressive']))} "
+                       f"{_n(nodes['risk-aggressive']['y'] + nodes['risk-aggressive']['h'])} "
+                       f"V {_n(nodes['risk-conservative']['y'])}"))
+    edges.append(_edge("risk-aggressive", "risk-neutral", "debate",
+                       _diagonal(nodes["risk-aggressive"], nodes["risk-neutral"], "right", "top")))
+    edges.append(_edge("risk-conservative", "risk-neutral", "debate",
+                       _diagonal(nodes["risk-conservative"], nodes["risk-neutral"], "right", "bottom")))
+    edges.append(_edge("risk", "portfolio", "flow",
+                       f"M {_n(_right_of(risk))} {_n(spine)} H {_n(nodes['portfolio']['x'])}"))
+    # feedback: straight up into the portfolio's bottom port
+    memory = nodes["memory"]
+    edges.append(_edge("memory", "portfolio", "bypass",
+                       f"M {_n(_centre_x(memory))} {_n(memory['y'])} "
+                       f"V {_n(nodes['portfolio']['y'] + nodes['portfolio']['h'])}"))
+    return edges
+
+
+def _edges_vertical(nodes: dict[str, dict], spec: dict, groups: dict) -> list[dict]:
+    """The narrow picture: one vertical spine, debate pairs side by side."""
+    edges = []
+    research, risk = groups["research"], groups["risk"]
+
+    # one stage line, as in the wide picture: group to group
+    input_group = groups["input"]
+    edges.append(_edge("input", "research", "flow",
+                       f"M {_n(input_group['x'] + input_group['w'] / 2)} "
+                       f"{_n(input_group['y'] + input_group['h'])} "
+                       f"V {_n(research['y'])}"))
+    edges.append(_edge("bull", "bear", "debate", _across(nodes["bull"], nodes["bear"])))
+    # a debate hands over as one thing: the manager reads the whole exchange,
+    # not one debater's take - so the group speaks, as in the wide picture
+    manager = nodes["research-manager"]
+    edges.append(_edge("research", "research-manager", "flow",
+                       f"M {_n(research['x'] + research['w'] / 2)} "
+                       f"{_n(research['y'] + research['h'])} V {_n(manager['y'])}"))
+    edges.append(_edge("research-manager", "trader", "flow",
+                       _drop(nodes["research-manager"], nodes["trader"])))
+    edges.append(_edge("trader", "risk", "flow",
+                       _enter(nodes["trader"], risk["x"] + risk["w"] / 2, risk["y"], None)))
+    edges.append(_edge("risk-aggressive", "risk-conservative", "debate",
+                       _across(nodes["risk-aggressive"], nodes["risk-conservative"])))
+    edges.append(_edge("risk-conservative", "risk-neutral", "debate",
+                       _diagonal(nodes["risk-conservative"], nodes["risk-neutral"], "bottom", "right")))
+    edges.append(_edge("risk-neutral", "risk-aggressive", "debate",
+                       _diagonal(nodes["risk-neutral"], nodes["risk-aggressive"], "left", "bottom")))
+    # the risk loop concludes as one decision as well
+    edges.append(_edge("risk", "portfolio", "flow",
+                       f"M {_n(risk['x'] + risk['w'] / 2)} "
+                       f"{_n(risk['y'] + risk['h'])} V {_n(nodes['portfolio']['y'])}"))
+    edges.append(_edge("memory", "portfolio", "bypass",
+                       _bypass(nodes["memory"], nodes["portfolio"], spec["margin_x"])))
+    return edges
+
+
+def _groups(spec: dict, nodes: dict[str, dict]) -> list[dict]:
+    """The declared group rects with their member ids resolved."""
+    groups = []
+    for group in spec["groups"]:
+        entry = dict(group)
+        members = entry["members"]
+        if members == "analysts":
+            entry["members"] = [node_id for node_id in nodes
+                                if node_id.startswith("analyst-")]
+        else:
+            entry["members"] = list(members)
+        groups.append(entry)
+    return groups
+
+
 def _layout(spec: dict, analysts: list[str]) -> dict:
     nodes = _build_nodes(spec, analysts)
     by_id = {node["id"]: node for node in nodes}
-    return {"viewBox": spec["viewBox"], "nodes": nodes, "edges": _edges(by_id, spec)}
+    return {"viewBox": spec["viewBox"], "nodes": nodes,
+            "edges": _edges(by_id, spec), "groups": _groups(spec, by_id)}
 
 
 def topology(analysts: list[str] | None) -> dict:

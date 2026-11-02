@@ -954,9 +954,20 @@ input[type="checkbox"] {
   transition: fill var(--dur-short) var(--ease-out);
 }
 
-.graph .node--active rect { fill: var(--color-accent-soft); stroke: var(--color-accent); stroke-width: 1.5; }
+.graph .node--active rect {
+  fill: var(--color-accent-soft);
+  stroke: var(--color-accent);
+  stroke-width: 1.5;
+  animation: node-breathe 1.8s ease-in-out infinite;
+}
+
+/* A working card breathes; a finished one goes quiet and solid. */
+@keyframes node-breathe {
+  0%, 100% { fill: var(--color-accent-soft); }
+  50% { fill: color-mix(in oklab, var(--color-accent-soft) 55%, var(--color-accent) 45%); }
+}
 .graph .node--active text { fill: var(--color-ink); }
-.graph .node--done rect { stroke: var(--color-ink-2); }
+.graph .node--done rect { stroke: var(--color-ink-2); fill: var(--color-paper-2); }
 .graph .node--done text { fill: var(--color-ink); }
 .graph .node--failed rect { fill: var(--color-bad-soft); stroke: var(--color-bad); stroke-width: 1.5; }
 .graph .node--failed text { fill: var(--color-bad); }
@@ -968,9 +979,6 @@ input[type="checkbox"] {
   stroke-linecap: round;
 }
 
-.graph .edge--debate { stroke-dasharray: 3 4; }
-.graph .edge--bypass { stroke-dasharray: 2 5; stroke: color-mix(in oklab, var(--color-muted) 60%, transparent); }
-
 .graph .edge.is-flowing {
   stroke: var(--color-cool);
   stroke-width: 1.6;
@@ -978,26 +986,80 @@ input[type="checkbox"] {
   animation: graph-flow 700ms linear infinite;
 }
 
-.graph .edge.is-debate {
-  stroke: var(--color-cool);
-  stroke-width: 1.4;
-  stroke-dasharray: 4 4;
-  animation: graph-flow 900ms linear infinite;
-}
-
 @keyframes graph-flow { to { stroke-dashoffset: -20; } }
 
-/* Narrow layout sets a smaller type scale for its 78px boxes. */
-@media (max-width: 719px) {
+/* Narrow layout sets a smaller type scale for its 78px boxes. The horizontal
+ * stage picture needs a metre of width to stay legible, so below that the
+ * spine takes over. */
+@media (max-width: 999px) {
   .graph .node text { font-size: 12px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .graph .edge.is-flowing,
-  .graph .edge.is-debate { animation: none; }
+  .graph .edge.is-debate,
+  .graph .node--active rect { animation: none; }
   .graph .node rect,
   .graph .node text { transition: none; }
 }
+
+/* Graph v2: three line languages, groups behind the boxes. */
+
+.graph .ta-group rect {
+  fill: var(--color-paper-3);
+  stroke: var(--color-rule);
+}
+
+.graph .ta-group text {
+  fill: var(--color-muted);
+  font: 500 11px/1 var(--font-body);
+}
+
+.graph .edge--flow { stroke: color-mix(in oklab, var(--color-muted) 62%, var(--color-rule)); }
+
+.graph .edge--debate {
+  stroke: var(--color-accent);
+  stroke-width: 1.4;
+}
+
+.graph .edge--debate .arrow-fill,
+#ta-arrow path { fill: var(--color-accent); }
+
+.graph .edge--debate.is-debate { stroke-width: 1.8; }
+
+.graph .edge--bypass {
+  stroke: var(--color-muted);
+  stroke-width: 1.2;
+  stroke-dasharray: 2 6;
+  stroke-linecap: round;
+  opacity: 0.85;
+}
+
+.graph__key--node-idle::before { border-color: var(--color-rule-2); background: var(--color-paper-2); }
+.graph__key--node-run::before { border-color: var(--color-accent); background: var(--color-accent-soft); }
+.graph__key--node-done::before { border-color: var(--color-ink-2); background: var(--color-paper-2); }
+
+.graph__key--line-main::before {
+  height: 2px;
+  border: 0;
+  border-radius: 1px;
+  background: color-mix(in oklab, var(--color-muted) 62%, var(--color-rule));
+}
+.graph__key--line-debate::before {
+  height: 2px;
+  border: 0;
+  border-radius: 1px;
+  background: var(--color-accent);
+}
+.graph__key--line-bypass::before {
+  height: 2px;
+  border: 0;
+  background: none;
+  border-top: 2px dotted var(--color-muted);
+}
+
+.panel--graph .graph__legend { margin-bottom: var(--space-md); }
+.panel--graph .hint { margin-top: var(--space-lg); }
 
 /* The company's short name rides under its code in the ledgers. */
 .sym { display: inline-flex; flex-direction: column; line-height: 1.3; }
