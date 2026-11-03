@@ -12,7 +12,6 @@ version constants for the formula/rule sets that live in this package.
 from __future__ import annotations
 
 import hashlib
-import html as html_module
 import importlib.metadata
 import json
 import subprocess
@@ -97,32 +96,13 @@ def collect(config: dict, trade_date: str, ticker: str | None = None) -> dict:
 
 
 def attach(report_path: Path, metadata: dict) -> None:
-    """Write the metadata next to the report and into both rendered forms."""
-    report_path = Path(report_path)
-    directory = report_path.parent
+    """Write the run's provenance beside the report, not into it.
+
+    The metadata used to be appended as a sixth section of the report. The
+    reader never asked for it there: the shell has a dedicated view and this
+    file is what archiving reads, so the report now carries only analysis.
+    """
+    directory = Path(report_path).parent
     (directory / "run_metadata.json").write_text(
         json.dumps(metadata, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
     )
-
-    markdown = report_path
-    if markdown.exists():
-        text = markdown.read_text(encoding="utf-8")
-        if _MARKER not in text:
-            lines = [_MARKER, ""] + [f"- {key}: {value}" for key, value in metadata.items()]
-            markdown.write_text(text.rstrip() + "\n\n" + "\n".join(lines) + "\n", encoding="utf-8")
-
-    page = directory / "complete_report.html"
-    if page.exists():
-        page_text = page.read_text(encoding="utf-8")
-        if "downstream-run-metadata" not in page_text:
-            rows = "".join(
-                f"<li><code>{html_module.escape(key)}</code>: "
-                f"{html_module.escape(str(value))}</li>"
-                for key, value in metadata.items()
-            )
-            block = (
-                '<section id="downstream-run-metadata">'
-                "<h2>Downstream run metadata</h2><ul>" + rows + "</ul></section>"
-            )
-            page_text = page_text.replace("</body>", block + "\n</body>", 1)
-            page.write_text(page_text, encoding="utf-8")
