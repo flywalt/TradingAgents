@@ -107,7 +107,6 @@ def test_a_quiet_source_is_no_items_not_unavailable():
 
 def test_a_failed_source_is_unavailable():
     from tradingagents.dataflows.errors import VendorUnavailableError
-
     from tradingagents_cn.agents import sentiment_analyst
 
     def boom():
