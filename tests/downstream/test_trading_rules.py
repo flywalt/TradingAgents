@@ -113,3 +113,18 @@ def test_the_reference_price_handles_a_bonus_share_ratio():
 def test_an_impossible_share_ratio_is_rejected():
     with pytest.raises(ValueError):
         reference_price("10.00", share_ratio="-1")
+
+
+def test_an_st_name_on_a_main_board_moves_five_percent():
+    from decimal import Decimal
+
+    from tradingagents_cn.trading_rules import is_st_name, limit_ratio
+
+    assert is_st_name("ST 测试") is True
+    assert is_st_name("*ST 测试") is True
+    assert is_st_name("贵州茅台") is False
+    assert is_st_name(None) is False
+    assert limit_ratio("600519.SH", is_st=True) == Decimal("0.05")
+    assert limit_ratio("600519.SH") == Decimal("0.10")
+    # the 20% boards keep their own band even for ST names
+    assert limit_ratio("300750.SZ", is_st=True) == Decimal("0.20")

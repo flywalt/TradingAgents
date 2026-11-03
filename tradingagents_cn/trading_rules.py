@@ -37,6 +37,17 @@ LIMIT_ST_MAIN = Decimal("0.05")
 T_PLUS_ONE = True
 
 
+def is_st_name(name: str | None) -> bool:
+    """Whether a listing name carries the ST / *ST marker.
+
+    The exchange encodes risk-warning status in the name itself, so the identity
+    row already answers the question the band depends on - no separate feed.
+    """
+    if not name:
+        return False
+    return str(name).strip().upper().lstrip("*").startswith("ST")
+
+
 def limit_ratio(symbol: str, *, is_st: bool = False) -> Decimal:
     """The maximum daily move for ``symbol`` as a fraction of the previous close."""
     canonical = normalize(symbol)

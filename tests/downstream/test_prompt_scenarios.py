@@ -93,19 +93,20 @@ def loss_income() -> pd.DataFrame:
 
 
 class FakeApi:
-    def __init__(self, *, limit_up=False, unavailable=False):
+    def __init__(self, *, limit_up=False, unavailable=False, name="贵州茅台"):
         self.limit_up = limit_up
         self.unavailable = unavailable
+        self.name = name
 
     def stock_basic(self, **kwargs):
         return pd.DataFrame([{
-            "ts_code": SYMBOL, "name": "贵州茅台", "area": "贵州", "industry": "白酒",
+            "ts_code": SYMBOL, "name": self.name, "area": "贵州", "industry": "白酒",
             "market": "主板", "list_date": "20010827", "delist_date": "", "list_status": "L",
         }])
 
     def namechange(self, **kwargs):
-        return pd.DataFrame([{"name": "贵州茅台", "start_date": "20010827",
-                              "end_date": "", "ann_date": "20010827"}])
+        return pd.DataFrame([{"name": self.name, "start_date": "20250101",
+                              "end_date": "", "ann_date": "20250101"}])
 
     def pro_bar(self, **kwargs):
         if self.unavailable:
@@ -215,9 +216,43 @@ def test_the_news_analyst_is_told_to_name_the_basis(offline):
     assert "本年累计" in captured            # the requirement names the basis it means
 
 
-def test_the_analysts_write_as_research(offline):
-    """Observations with sources, not instructions - in both analysts."""
+def test_the_analysts_write_from_the_data(offline):
+    """Evidence discipline, not a compliance posture: sources, no invented numbers."""
     captured = _run(offline, FakeApi(limit_up=True))
 
-    assert "every factual claim carries its source and date" in captured
-    assert captured.count("not instructions to buy or sell") >= 2
+    assert "Every factual claim carries its source and date" in captured
+    assert captured.count("Do not describe what the data cannot show") >= 2
+    assert "Before answering, re-read once" in captured
+    # the compliance framing this tool does not need was withdrawn
+    assert "not instructions to buy or sell" not in captured
+
+
+def test_an_st_name_reaches_the_model_with_its_five_percent_band(offline):
+    """The name says ST; the band must not still read ±10%."""
+    captured = _run(offline, FakeApi(name="ST 茅台"))
+
+    assert "±5%" in captured
+    assert "ST name" in captured
+    assert "±10%" not in captured
+
+
+def test_a_plain_name_is_told_st_status_is_unknown(offline):
+    captured = _run(offline, FakeApi())
+
+    assert "±10%" in captured
+    assert "ST status is unknown" in captured
+
+
+def test_the_prompts_carry_a_good_and_a_bad_example(offline):
+    """A do/don't pair from real drifting: intraday colour from daily bars."""
+    captured = _run(offline, FakeApi(limit_up=True))
+
+    assert "前复权" in captured                       # the good example names the basis
+    assert "盘中冲高至 1400 后回落" in captured        # the bad example is shown to be rejected
+    assert "营收同比增长 12%" in captured             # numbers not in the data are rejected
+
+
+def test_a_daily_bar_window_is_not_dressed_up_as_intraday(offline):
+    """The data layer says daily; the prompt forbids implying otherwise."""
+    captured = _run(offline, FakeApi(limit_up=True, ))
+    assert "A daily bar is a daily bar" in captured

@@ -41,7 +41,15 @@ Two event streams are prefetched below. Read them before deciding what to look u
 - Two markers carry different meanings. NO_ITEMS: the source answered and nothing matched the window - the issuer was quiet, report it as quiet. UNAVAILABLE: the source failed - report it as missing data. Never swap them, never fill either in.
 - Never invent an event, a filing or a number.
 - Name the basis of every number you cite: prices with their adjustment basis (前复权/qfq) and anchor date, financials with their period basis (本年累计/单季) and unit, exactly as the table headers state them. If a header does not say, call the basis unstated rather than guessing.
-- Write as research: every factual claim carries its source and date; conclusions are observations with evidence, not instructions to buy or sell - another agent decides the trade.
+- Every factual claim carries its source and date. State the conclusion plainly; the reader decides what to do with it.
+- Do not describe what the data cannot show. A daily bar is a daily bar: no intraday path, no "站上/站稳" claimed from a single snapshot, no tick-level colour.
+- Numbers come only from the tables and filings in this run. If a figure is not there, say it is missing; never fill it from memory.
+- Examples of that line:
+    write "收盘 1392.05（2026-10-30，前复权）"
+    do not write "盘中冲高至 1400 后回落" - the window has daily bars only
+    write "第三季度报告已披露（2026-10-30，雪球公告）"
+    do not write "营收同比增长 12%" - no such figure is in the data
+- Before answering, re-read once and delete any number without a source in this run, and any sentence the bars cannot support.
 
 <start_of_cls_events>
 {cls_block}

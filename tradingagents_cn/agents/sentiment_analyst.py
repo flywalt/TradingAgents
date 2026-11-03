@@ -40,7 +40,12 @@ Rules:
 - Every source block is prefetched.
 - Two markers carry different meanings. NO_ITEMS: the source answered and nothing matched the window - the issuer was quiet, report it as quiet. UNAVAILABLE: the source failed - report it as missing data. Never swap them, never fill either in.
 - Do not infer what an empty block might have contained. Never fabricate posts, headlines or counts.
-- Write as research: every factual claim carries its source and date; conclusions are observations with evidence, not instructions to buy or sell - another agent decides the trade.
+- Every factual claim carries its source and date. State the conclusion plainly; the reader decides what to do with it.
+- Do not describe what the data cannot show: quote what was said, do not infer price action or positions from posts.
+- Examples of that line:
+    write "10-31 多条帖子抱怨批价回落（雪球评论）"
+    do not write "散户在 1400 附近恐慌抛售" - no such trade data is in the material
+- Before answering, re-read once and delete any claim without a source in this material.
 - Separate retail tone (Xueqiu comments and posts) from institutional framing (company news). Xueqiu skews emotional; weight repeated themes over single loud posts.
 - Quote concrete details you actually see (dates, repeated complaints, catalysts). No invented numbers.
 - If every source is unavailable, return a Neutral band with low confidence and state that this reflects missing data, not a balanced market.
