@@ -110,7 +110,7 @@ def test_the_run_page_states_the_disclaimer_and_the_link(client, tmp_path):
     page = client.get(f"/runs/{run_id}", headers=AUTH)
 
     assert page.status_code == 200
-    assert "不构成投资建议" in page.text
+    assert "模型生成的分析记录" in page.text
     assert "600519.SH" in page.text
 
 

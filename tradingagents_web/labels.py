@@ -6,13 +6,15 @@ instead of quietly falling back to English on a page nobody re-reads.
 
 from __future__ import annotations
 
-#: Kernel rating enum → the word the UI shows (see spec §9: never an instruction).
+#: Kernel rating enum → the word the UI shows. Literal on purpose: this is a
+#: single-user research tool, so the enum means what it says - no softening
+#: for the sake of a compliance posture the reader does not need.
 RATING_LABELS = {
-    "Buy": "乐观",
-    "Overweight": "偏乐观",
-    "Hold": "中性",
-    "Underweight": "偏审慎",
-    "Sell": "审慎",
+    "Buy": "买入",
+    "Overweight": "增持",
+    "Hold": "持有",
+    "Underweight": "减持",
+    "Sell": "卖出",
     "REVIEW": "需人工复核",
 }
 

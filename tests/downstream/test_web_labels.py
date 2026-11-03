@@ -22,8 +22,8 @@ def test_every_analyst_key_maps_to_a_kernel_node():
 
 def test_rating_labels_cover_the_kernel_enums():
     assert labels.RATING_LABELS == {
-        "Buy": "乐观", "Overweight": "偏乐观", "Hold": "中性",
-        "Underweight": "偏审慎", "Sell": "审慎", "REVIEW": "需人工复核",
+        "Buy": "买入", "Overweight": "增持", "Hold": "持有",
+        "Underweight": "减持", "Sell": "卖出", "REVIEW": "需人工复核",
     }
 
 
