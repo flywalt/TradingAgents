@@ -223,7 +223,7 @@ rating = run_rating(final)                                   # 五档 or REVIEW
 | `/runs/{id}/report` | 沙箱内 HTML（按运行语言呈现）；上方显示 profile、版本、`job.json` 摘要 |
 | `/history` | 过滤 + 分页 |
 
-合规展示：`Buy/Overweight/Hold/Underweight/Sell` → **乐观/中性/审慎**，固定"仅供研究，不构成投资建议"。
+展示：`Buy/Overweight/Hold/Underweight/Sell` → **买入/增持/持有/减持/卖出**（直译，不软化）。
 只改展示，不改报告正文。
 
 ### 9.1 报告呈现层（本地化）

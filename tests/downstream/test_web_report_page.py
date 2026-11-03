@@ -55,7 +55,7 @@ def test_a_chinese_run_gets_a_chinese_masthead():
 def test_the_rating_keeps_its_kernel_word_in_the_tooltip():
     out = report_page.present(SAMPLE, "中文")
 
-    assert '<span class="rating level" title="Hold">中性</span>' in out
+    assert '<span class="rating level" title="Hold">持有</span>' in out
 
 
 def test_the_report_body_is_never_touched():
@@ -181,10 +181,10 @@ def test_agent_names_are_translated_where_the_kernel_names_them():
 def test_kernel_enums_and_labels_are_translated_inside_strong():
     out = report_page.present(SAMPLE, "中文")
 
-    assert "<strong>评级</strong>: 中性（HOLD）" in out
+    assert "<strong>评级</strong>: 持有（HOLD）" in out
     assert "<strong>执行摘要</strong>" in out
-    assert "<strong>中性（HOLD）</strong>" in out
-    assert "<strong>乐观（BUY）</strong>" in out
+    assert "<strong>持有（HOLD）</strong>" in out
+    assert "<strong>买入（BUY）</strong>" in out
     # prose outside <strong> is never touched
     assert "均为内核枚举" in out
 
