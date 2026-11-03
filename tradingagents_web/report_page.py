@@ -103,20 +103,6 @@ _STRONG_ENUM = re.compile(
     r"<strong>(BUY|SELL|HOLD|OVERWEIGHT|UNDERWEIGHT|BULLISH|BEARISH)</strong>", re.I)
 _RATING_AFTER_LABEL = re.compile(
     r"(<strong>评级</strong>:\s*)(BUY|SELL|HOLD|OVERWEIGHT|UNDERWEIGHT)", re.I)
-#: The rail shows the chapter name at rest (the full heading is too wide and the
-#: upstream rail hides it entirely); hover still opens the agent sub-lists.
-_NAV_SHORT = {
-    "分析师团队报告": "分析",
-    "研究团队结论": "研究",
-    "交易团队方案": "交易",
-    "风险管理团队结论": "风险",
-    "组合经理决策": "决策",
-    "下游运行元数据": "元数据",
-}
-_NAV_ENTRY = re.compile(
-    r'<span class="num">([一二三四五六])</span>\s*'
-    r'<span class="label">([^<]+)</span>')
-
 _VENDOR_NAMES = {
     "Prices": "行情", "Indicators": "指标", "Fundamentals": "基本面",
     "News": "新闻", "Macro": "宏观", "Prediction markets": "预测市场",
@@ -152,13 +138,19 @@ main h6 { font: 600 1rem/1.4 var(--sans); color: var(--muted); }
   border-left: 3px solid var(--accent); border-radius: 6px; background: var(--wash); }
 .ta-summary h2 { margin: 0 0 0.6rem; font: 650 1.13rem/1.3 var(--sans); }
 .ta-summary p { margin: 0 0 0.7rem; font-size: 0.95rem; }
-/* The rail keeps a readable chapter name at rest instead of a numeral and a
- * bare rule; the agent list opens on hover or focus. Below 72rem there is no
- * room beside a 46rem column, so upstream's compact rail is left alone. */
+/* A desktop has the room for the whole rail: every row stays listed and every
+ * label stays visible, so the pointer never travels to find a chapter and
+ * nothing shifts when it moves. Below 72rem there is no space beside a 46rem
+ * column, so upstream's compact rail is left alone. */
 @media (min-width: 72rem) {
-  .contents { min-width: 7.5rem; }
-  .contents > ul > li > a .label { max-width: none; opacity: 1; }
-  .contents:not(:hover):not(:focus-within) ul ul { display: none; }
+  .contents { min-width: 9.5rem; }
+  .contents .label { max-width: none; opacity: 1; }
+}
+
+/* Upstream hides the back-to-top link on wide screens; a long report still
+ * needs one there. */
+@media (min-width: 60rem) {
+  .to-top { display: inline-block; }
 }
 .ta-summary p:last-child { margin-bottom: 0; }
 .ta-summary__more { font: 0.85rem/1.4 var(--sans); }
@@ -226,14 +218,6 @@ def _localise_enum(match: re.Match) -> str:
     return f"<strong>{chinese}（{word.upper()}）</strong>"
 
 
-def _shorten_nav(match: re.Match) -> str:
-    numeral, label = match.group(1), match.group(2)
-    short = _NAV_SHORT.get(label)
-    if not short:
-        return match.group(0)
-    return f'<span class="num">{numeral}</span> <span class="label">{short}</span>'
-
-
 def _localise_glossary(html: str) -> str:
     html = _AGENT_LABEL.sub(_localise_agent_name, html)
     for english, chinese in SCHEMA_LABELS.items():
@@ -247,7 +231,74 @@ def _localise_glossary(html: str) -> str:
     return html
 
 
-_PM_HEADING = re.compile(r'<h3 id="(s\d+)-1">Portfolio Manager</h3>')
+_HEADING = re.compile(r"<h([2-6])([^>]*)>(.*?)</h\1>", re.S)
+#: Leading enumeration a heading may already carry - ours or the model's.
+_LEADING_NUMBER = re.compile(
+    r"^\s*(?:[一二三四五六七八九十]+、|（[一二三四五六七八九十]+）|"
+    r"\d{1,2}[.、)）]|[（(]\d{1,2}[)）]|[①-⑳])\s*")
+_CN_NUMERALS = "一二三四五六七八九十"
+
+
+def _cn(number: int) -> str:
+    if number <= 10:
+        return _CN_NUMERALS[number - 1]
+    if number < 20:
+        return "十" + _CN_NUMERALS[number - 11]
+    return str(number)
+
+
+def _circled(number: int) -> str:
+    return chr(0x2460 + number - 1) if 1 <= number <= 20 else f"({number})"
+
+
+def _numbered(level: int, counts: list[int]) -> str:
+    section, agent, sub, subsub, leaf = counts
+    if level == 2:
+        return f"{_cn(section)}、"
+    if level == 3:
+        return f"（{_cn(agent)}）"
+    if level == 4:
+        return f"{sub}. "
+    if level == 5:
+        return f"（{subsub}）"
+    return f"{_circled(leaf)} "
+
+
+def _number_headings(html: str) -> str:
+    """One numbering scheme for the whole report: 一、/（一）/1./（1）/①.
+
+    The kernel numbers its sections and the model numbers its own headings, so a
+    page can carry two "一、" at different depths. Every heading's own leading
+    number is stripped and the scheme reapplied by depth, counters resetting at
+    each parent.
+    """
+    counts = [0, 0, 0, 0, 0]
+
+    def replace(match: re.Match) -> str:
+        level = int(match.group(1))
+        attrs, text = match.group(2), match.group(3)
+        if "ta-summary-title" in attrs:
+            return match.group(0)
+        text = _LEADING_NUMBER.sub("", text).strip()
+        index = level - 2
+        counts[index] += 1
+        for deeper in range(index + 1, 5):
+            counts[deeper] = 0
+        return f"<h{level}{attrs}>{_numbered(level, counts)}{text}</h{level}>"
+
+    html = _HEADING.sub(replace, html)
+    # the rail repeats the agent names; give them the same numbers
+    return re.sub(r'(<a href="#s\d+-)(\d+)(">\s*(?:<span class="bar"></span>\s*)?'
+                  r'<span class="label">)([^<]+)', _number_nav_agent, html)
+
+
+def _number_nav_agent(match: re.Match) -> str:
+    index = int(match.group(2))
+    label = re.sub(r"^（[一二三四五六七八九十]+）", "", match.group(4))
+    return f"{match.group(1)}{match.group(2)}{match.group(3)}（{_cn(index)}）{label}"
+
+
+_PM_HEADING = re.compile(r'<h3 id="(s\d+)-1">(?:（[一二三四五六七八九十]+）)?Portfolio Manager</h3>')
 _PARAGRAPH = re.compile(r"<p>.*?</p>", re.S)
 _TAG = re.compile(r"<[^>]+>")
 
@@ -284,6 +335,12 @@ def _summary_card(html: str) -> str:
 
 _TICKER_SPAN = re.compile(r'<span class="ticker">([^<]+)</span>')
 
+#: Our own former addition: provenance used to be appended as a sixth section.
+#: Runs written before that stopped still carry it; the reader does not want it,
+#: so it is dropped on the way out (new runs never write it).
+_FORMER_METADATA = re.compile(
+    r'<section id="downstream-run-metadata">.*?</section>\s*', re.S)
+
 
 def _lead_with_name(html: str, name: str) -> str:
     """The company leads where there is room; the code always follows it."""
@@ -301,6 +358,7 @@ def _lead_with_name(html: str, name: str) -> str:
 
 def present(html: str, language: str | None, name: str | None = None) -> str:
     """Return the page as the run's language asked for it."""
+    html = _FORMER_METADATA.sub("", html)
     if not _is_chinese(language):
         return _lead_with_name(html, name) if name else html
     for old, new in _replacements():
@@ -315,7 +373,7 @@ def present(html: str, language: str | None, name: str | None = None) -> str:
         if card:
             html = html.replace("</header>", "</header>\n" + card, 1)
     html = _localise_glossary(html)
-    html = _NAV_ENTRY.sub(_shorten_nav, html)
+    html = _number_headings(html)
     if '<style id="ta-cn">' not in html:
         html = html.replace("</head>", _CN_STYLE + "\n</head>", 1)
     return html

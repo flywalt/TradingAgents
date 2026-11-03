@@ -88,19 +88,20 @@ def test_saving_a_report_records_the_metadata_everywhere(graph, tmp_path):
     assert payload["data_as_of"] == "2026-09-30"
     assert payload["extension_version"] == graph.config["cn_extension_version"]
 
+    # the report carries analysis only; provenance lives beside it
     markdown = path.read_text(encoding="utf-8")
-    assert "## Downstream run metadata" in markdown
-    assert payload["upstream_commit"] in markdown
+    assert "Downstream run metadata" not in markdown
+    assert payload["upstream_commit"] not in markdown
 
     page = (path.parent / "complete_report.html").read_text(encoding="utf-8")
-    assert 'id="downstream-run-metadata"' in page
-    assert payload["downstream_commit"] in page
+    assert "downstream-run-metadata" not in page
 
 
-def test_saving_twice_does_not_duplicate_the_block(graph):
+def test_saving_twice_leaves_the_report_and_the_record_alone(graph):
     state = {"trade_date": date.today().isoformat(), "final_trade_decision": "**Rating**: Hold"}
 
     first = graph.save_reports(state, "600519.SH")
     graph.save_reports(state, "600519.SH", save_path=first.parent)
 
-    assert first.read_text(encoding="utf-8").count("## Downstream run metadata") == 1
+    assert first.read_text(encoding="utf-8").count("Downstream run metadata") == 0
+    assert (first.parent / "run_metadata.json").is_file()

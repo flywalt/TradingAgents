@@ -44,10 +44,10 @@ def test_a_chinese_run_gets_a_chinese_masthead():
     assert '<p class="date">分析日期 2026-11-02</p>' in out
     assert "<dt>生成时间</dt>" in out
     assert "<dt>辩论轮次</dt>" in out
-    assert "<h2>一、分析师团队报告</h2>" in out
-    assert "<h2>下游运行元数据</h2>" in out
+    assert "<h2>一、分析师团队报告</h2>" in out      # sections: 一、
+    assert "<h2>三、下游运行元数据</h2>" in out
     assert '<span class="num">一</span>' in out
-    assert '<span class="label">分析</span>' in out      # the rail's short name
+    assert '<span class="label">分析师团队报告</span>' in out   # the rail, fully open
     assert "回到顶部" in out
     assert "研究报告</title>" in out
 
@@ -62,7 +62,7 @@ def test_the_report_body_is_never_touched():
     out = report_page.present(SAMPLE, "中文")
 
     assert "正文中的 Generated、Analysts 这些词不该被翻译。" in out
-    assert '<h3 id="s1-1">市场分析师</h3>' in out   # agent name follows the glossary
+    assert '<h3 id="s1-1">（一）市场分析师</h3>' in out   # agents: （一）
 
 
 def test_an_english_run_is_returned_unchanged():
@@ -173,8 +173,8 @@ def test_agent_names_are_translated_where_the_kernel_names_them():
     """The h3 headings and the contents rail repeat the kernel's node names."""
     out = report_page.present(SAMPLE, "中文")
 
-    assert '<h3 id="s1-1">市场分析师</h3>' in out          # id keeps its anchor
-    assert '<span class="label">市场分析师</span>' in out   # the rail too
+    assert '<h3 id="s1-1">（一）市场分析师</h3>' in out          # id keeps its anchor
+    assert '<span class="label">（一）市场分析师</span>' in out   # the rail too
     assert "Market Analyst" not in out
 
 
@@ -294,11 +294,28 @@ def test_the_schema_labels_cover_upstream():
     assert labels <= known, labels - known
 
 
-def test_the_rail_names_each_chapter_at_rest():
-    """A numeral plus a bare rule is unreadable; the chapter name shows."""
+def test_the_rail_opens_fully_on_a_wide_screen():
+    """PC has the room: labels are always visible and every row is listed, so
+    the pointer never has to travel up and down to find a chapter."""
     out = report_page.present(SAMPLE, "中文")
 
-    assert '<span class="num">一</span> <span class="label">分析</span>' in out
     style = out[out.index('<style id="ta-cn">'):out.index("</style>")]
-    assert ".contents:not(:hover):not(:focus-within) ul ul { display: none; }" in style
-    assert "@media (min-width: 72rem)" in style
+    assert ".contents .label { max-width: none; opacity: 1; }" in style
+    assert "ul ul { display: none" not in style    # nothing is folded away
+    assert '<span class="label">（一）市场分析师</span>' in out
+
+
+def test_the_metadata_section_we_no_longer_write_is_dropped():
+    """Reports written before this decision still carry it; the reader should
+    not see a sixth chapter of provenance."""
+    html = SAMPLE.replace("</body>",
+                          '<section id="downstream-run-metadata">'
+                          '<h2>Downstream run metadata</h2><ul><li>x</li></ul></section>'
+                          "</body>")
+
+    for language in ("中文", "English"):
+        out = report_page.present(html, language)
+        assert "downstream-run-metadata" not in out, language
+    # the fixture's own sixth heading is a different thing; in Chinese it is the
+    # translated chapter and stays
+    assert "下游运行元数据" in report_page.present(html, "中文")
