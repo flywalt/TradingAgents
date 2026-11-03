@@ -256,3 +256,11 @@ def test_a_daily_bar_window_is_not_dressed_up_as_intraday(offline):
     """The data layer says daily; the prompt forbids implying otherwise."""
     captured = _run(offline, FakeApi(limit_up=True, ))
     assert "A daily bar is a daily bar" in captured
+
+
+def test_the_price_table_states_its_basis_and_anchor(offline):
+    """On an ex-rights stretch the anchor decides historical prices; the model
+    must receive that statement with the table, not just a bare series."""
+    captured = _run(offline, FakeApi(limit_up=True))
+
+    assert "# Price basis: qfq anchored at 2026-09-30" in captured
