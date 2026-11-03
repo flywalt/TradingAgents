@@ -125,7 +125,9 @@ def test_the_constraints_state_what_the_feed_cannot_tell(offline):
 
     prompt = model.prompts[0]
     assert "±10%" in prompt
-    assert "ST status and suspensions are unavailable" in prompt
+    # the feed cannot tell ST status for a plain name; a named ST would say so
+    assert "ST status is unknown" in prompt
+    assert "suspensions are unknown" in prompt
 
 
 def test_a_us_run_carries_no_a_share_constraints(offline):
