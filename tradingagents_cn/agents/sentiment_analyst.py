@@ -61,8 +61,10 @@ Rules:
 
 
 def _block(items: list[dict], limit: int = _MAX_ITEMS) -> str:
+    """Render items with the same split as blocks.py: a source that answered
+    with nothing is a quiet issuer, not a broken feed."""
     if not items:
-        return "UNAVAILABLE: this source returned no items in the window."
+        return "NO_ITEMS: this source answered but had nothing in the window."
     lines = []
     for item in items[:limit]:
         stamp = item["published"].isoformat() if item.get("published") else "no-date"
