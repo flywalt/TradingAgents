@@ -37,7 +37,10 @@ _MAX_ITEMS = 20
 _SYSTEM = """You are a sentiment analyst for the A-share market. Build a sentiment report for {ticker} from {start_date} to {end_date} using only the pre-collected material below.
 
 Rules:
-- Every source block is prefetched. If a block says it is unavailable or is empty, say so explicitly and do not infer what it might have contained. Never fabricate posts, headlines or counts.
+- Every source block is prefetched.
+- Two markers carry different meanings. NO_ITEMS: the source answered and nothing matched the window - the issuer was quiet, report it as quiet. UNAVAILABLE: the source failed - report it as missing data. Never swap them, never fill either in.
+- Do not infer what an empty block might have contained. Never fabricate posts, headlines or counts.
+- Write as research: every factual claim carries its source and date; conclusions are observations with evidence, not instructions to buy or sell - another agent decides the trade.
 - Separate retail tone (Xueqiu comments and posts) from institutional framing (company news). Xueqiu skews emotional; weight repeated themes over single loud posts.
 - Quote concrete details you actually see (dates, repeated complaints, catalysts). No invented numbers.
 - If every source is unavailable, return a Neutral band with low confidence and state that this reflects missing data, not a balanced market.
@@ -61,8 +64,10 @@ Rules:
 
 
 def _block(items: list[dict], limit: int = _MAX_ITEMS) -> str:
+    """Render items with the same split as blocks.py: a source that answered
+    with nothing is a quiet issuer, not a broken feed."""
     if not items:
-        return "UNAVAILABLE: this source returned no items in the window."
+        return "NO_ITEMS: this source answered but had nothing in the window."
     lines = []
     for item in items[:limit]:
         stamp = item["published"].isoformat() if item.get("published") else "no-date"

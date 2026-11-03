@@ -96,3 +96,20 @@ def test_the_cn_graph_uses_the_downstream_sentiment_factory(monkeypatch, tmp_pat
     build_graph(settings, symbol="600519.SH")
 
     assert calls, "the CN graph did not use the downstream sentiment factory"
+
+
+def test_a_quiet_source_is_no_items_not_unavailable():
+    """Same split as blocks.py: answered-with-nothing is not a broken feed."""
+    from tradingagents_cn.agents import sentiment_analyst
+
+    assert sentiment_analyst._block([]).startswith("NO_ITEMS")
+
+
+def test_a_failed_source_is_unavailable():
+    from tradingagents.dataflows.errors import VendorUnavailableError
+    from tradingagents_cn.agents import sentiment_analyst
+
+    def boom():
+        raise VendorUnavailableError("xueqiu down")
+
+    assert sentiment_analyst._safe("xueqiu comments", boom).startswith("UNAVAILABLE")

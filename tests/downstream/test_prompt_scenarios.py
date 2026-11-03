@@ -190,3 +190,34 @@ def test_a_limit_up_close_arrives_with_the_band_that_governs_it(offline):
     assert "110.00" in captured          # the close itself
     assert "±10%" in captured            # the board rule from the context layer
     assert "NO_DATA_AVAILABLE" not in captured
+
+
+def test_the_agents_state_the_missing_data_split(offline):
+    """NO_ITEMS is a quiet issuer, UNAVAILABLE is a broken source - the model
+    must be told the difference where it reads, in both analysts."""
+    captured = _run(offline, FakeApi(limit_up=True))
+
+    assert "NO_ITEMS: the source answered" in captured
+    assert "the issuer was quiet" in captured
+    assert "UNAVAILABLE: the source failed" in captured
+    assert "Never swap them" in captured
+    # both analysts carry the rule, not just one of them
+    assert captured.count("NO_ITEMS: the source answered") >= 2
+
+
+def test_the_news_analyst_is_told_to_name_the_basis(offline):
+    """A number without its basis is a different number; the prompt must demand it."""
+    captured = _run(offline, FakeApi(limit_up=True))
+
+    assert "adjustment basis" in captured
+    assert "anchor date" in captured
+    assert "period basis" in captured
+    assert "本年累计" in captured            # the requirement names the basis it means
+
+
+def test_the_analysts_write_as_research(offline):
+    """Observations with sources, not instructions - in both analysts."""
+    captured = _run(offline, FakeApi(limit_up=True))
+
+    assert "every factual claim carries its source and date" in captured
+    assert captured.count("not instructions to buy or sell") >= 2
