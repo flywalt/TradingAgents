@@ -47,7 +47,7 @@ def test_a_chinese_run_gets_a_chinese_masthead():
     assert "<h2>一、分析师团队报告</h2>" in out
     assert "<h2>下游运行元数据</h2>" in out
     assert '<span class="num">一</span>' in out
-    assert '<span class="label">分析师团队报告</span>' in out
+    assert '<span class="label">分析</span>' in out      # the rail's short name
     assert "回到顶部" in out
     assert "研究报告</title>" in out
 
@@ -238,3 +238,67 @@ def test_the_name_leads_even_in_an_english_report():
     out = report_page.present(SAMPLE, "English", name="Kweichow Moutai")
 
     assert '<span class="ticker">Kweichow Moutai · 600519.SH</span>' in out
+
+
+def test_every_fixed_label_the_kernel_writes_is_translated():
+    """One pass, from the source that writes them - not a list grown by eye."""
+    body = ("<p><strong>Investment Thesis</strong>: x</p>"
+            "<p><strong>Price Target</strong>: 1400</p>"
+            "<p><strong>Entry Price</strong>: 1342</p>"
+            "<p><strong>Stop Loss</strong>: 1295</p>"
+            "<p><strong>Position Sizing</strong>: 0.25</p>"
+            "<p><strong>Time Horizon</strong>: 3 months</p>"
+            "<p><strong>Action</strong>: Buy</p>"
+            "<p><strong>Rationale</strong>: y</p>"
+            "<p><strong>Recommendation</strong>: z</p>"
+            "<p><strong>Strategic Actions</strong>: w</p>"
+            "<p>FINAL TRANSACTION PROPOSAL: <strong>OVERWEIGHT</strong></p>")
+    html = SAMPLE.replace("<main>", "<main>" + body)
+
+    out = report_page.present(html, "中文")
+
+    for english in ("Investment Thesis", "Price Target", "Entry Price", "Stop Loss",
+                    "Position Sizing", "Time Horizon", "Rationale", "Recommendation",
+                    "Strategic Actions", "FINAL TRANSACTION PROPOSAL"):
+        assert english not in out, english
+    assert "<strong>投资论点</strong>" in out
+    assert "<strong>目标价</strong>" in out
+    assert "最终交易建议：" in out
+    assert "<strong>增持（OVERWEIGHT）</strong>" in out
+
+
+def test_an_enum_value_keeps_its_kernel_word_whatever_the_casing():
+    html = SAMPLE.replace("<strong>Rating</strong>: HOLD", "<strong>Rating</strong>: Overweight")
+
+    out = report_page.present(html, "中文")
+
+    assert "<strong>评级</strong>: 增持（OVERWEIGHT）" in out
+
+
+def test_the_schema_labels_cover_upstream():
+    """Fragile coupling: a label added upstream must fail here, not leak English."""
+    import re
+    from pathlib import Path
+
+    sources = [Path("tradingagents/agents/schemas.py"),
+               Path("tradingagents/agents/trader/trader.py"),
+               Path("tradingagents/agents/managers/portfolio_manager.py")]
+    labels = set()
+    for path in sources:
+        text = path.read_text(encoding="utf-8")
+        labels |= set(re.findall(r"\*\*([A-Z][A-Za-z ]{2,24})\*\*", text))
+        labels |= set(re.findall(r'\("([A-Z][A-Za-z ]{2,24})"', text))
+
+    enums = {"Buy", "Sell", "Hold", "Overweight", "Underweight"}
+    known = set(report_page.SCHEMA_LABELS) | enums | {"None"}
+    assert labels <= known, labels - known
+
+
+def test_the_rail_names_each_chapter_at_rest():
+    """A numeral plus a bare rule is unreadable; the chapter name shows."""
+    out = report_page.present(SAMPLE, "中文")
+
+    assert '<span class="num">一</span> <span class="label">分析</span>' in out
+    style = out[out.index('<style id="ta-cn">'):out.index("</style>")]
+    assert ".contents:not(:hover):not(:focus-within) ul ul { display: none; }" in style
+    assert "@media (min-width: 72rem)" in style

@@ -66,25 +66,57 @@ _AGENT_LABEL = re.compile(
     r"Research Manager|Trader|Aggressive Analyst|Conservative Analyst|"
     r"Neutral Analyst|Portfolio Manager)(</h3>|</span>)")
 
-#: Bold labels and enums the agents emit (`**Rating**: HOLD`). Matched only
-#: inside <strong>, so prose that merely mentions these words is untouched.
-_STRONG_PAIRS = (
-    ("<strong>Rating</strong>", "<strong>评级</strong>"),
-    ("<strong>Executive Summary</strong>", "<strong>执行摘要</strong>"),
-    ("<strong>Confidence</strong>", "<strong>置信度</strong>"),
-    ("<strong>HOLD</strong>", "<strong>持有（HOLD）</strong>"),
-    ("<strong>Hold</strong>", "<strong>持有（Hold）</strong>"),
-    ("<strong>BUY</strong>", "<strong>买入（BUY）</strong>"),
-    ("<strong>Buy</strong>", "<strong>买入（Buy）</strong>"),
-    ("<strong>SELL</strong>", "<strong>卖出（SELL）</strong>"),
-    ("<strong>Sell</strong>", "<strong>卖出（Sell）</strong>"),
-    ("<strong>BULLISH</strong>", "<strong>看多（BULLISH）</strong>"),
-    ("<strong>Bullish</strong>", "<strong>看多（Bullish）</strong>"),
-    ("<strong>BEARISH</strong>", "<strong>看空（BEARISH）</strong>"),
-    ("<strong>Bearish</strong>", "<strong>看空（Bearish）</strong>"),
-)
+#: The fixed labels the kernel writes into a report, taken from the source that
+#: renders them (``agents/schemas.py`` and the prompts in ``agent/trader`` /
+#: ``agent/managers/portfolio_manager``). Enumerated once from source rather than
+#: grown by looking at outputs: the vocabulary is finite because the writers are.
+#: ``test_the_schema_labels_cover_upstream`` fails when upstream adds one.
+SCHEMA_LABELS = {
+    "Action": "操作",
+    "Entry Price": "买入价",
+    "Executive Summary": "执行摘要",
+    "Investment Thesis": "投资论点",
+    "Position Sizing": "仓位",
+    "Price Target": "目标价",
+    "Rating": "评级",
+    "Rating Scale": "评级刻度",
+    "Rationale": "依据",
+    "Reasoning": "推理",
+    "Recommendation": "建议",
+    "Stop Loss": "止损价",
+    "Strategic Actions": "策略动作",
+    "Time Horizon": "时间跨度",
+}
+
+#: `FINAL TRANSACTION PROPOSAL: **BUY**` is the one fixed phrase outside a bold
+#: label; it sits in prose, so it is matched as that exact string.
+FINAL_PROPOSAL = "FINAL TRANSACTION PROPOSAL:"
+FINAL_PROPOSAL_ZH = "最终交易建议："
+
+#: Enums, any casing, inside <strong> or right after the rating label.
+_ENUMS = {
+    "BUY": "买入", "SELL": "卖出", "HOLD": "持有",
+    "OVERWEIGHT": "增持", "UNDERWEIGHT": "减持",
+    "BULLISH": "看多", "BEARISH": "看空",
+}
+_STRONG_ENUM = re.compile(
+    r"<strong>(BUY|SELL|HOLD|OVERWEIGHT|UNDERWEIGHT|BULLISH|BEARISH)</strong>", re.I)
 _RATING_AFTER_LABEL = re.compile(
-    r"(<strong>评级</strong>:\s*)(HOLD|Hold|BUY|Buy|SELL|Sell|OVERWEIGHT|Underweight|UNDERWEIGHT)")
+    r"(<strong>评级</strong>:\s*)(BUY|SELL|HOLD|OVERWEIGHT|UNDERWEIGHT)", re.I)
+#: The rail shows the chapter name at rest (the full heading is too wide and the
+#: upstream rail hides it entirely); hover still opens the agent sub-lists.
+_NAV_SHORT = {
+    "分析师团队报告": "分析",
+    "研究团队结论": "研究",
+    "交易团队方案": "交易",
+    "风险管理团队结论": "风险",
+    "组合经理决策": "决策",
+    "下游运行元数据": "元数据",
+}
+_NAV_ENTRY = re.compile(
+    r'<span class="num">([一二三四五六])</span>\s*'
+    r'<span class="label">([^<]+)</span>')
+
 _VENDOR_NAMES = {
     "Prices": "行情", "Indicators": "指标", "Fundamentals": "基本面",
     "News": "新闻", "Macro": "宏观", "Prediction markets": "预测市场",
@@ -120,6 +152,14 @@ main h6 { font: 600 1rem/1.4 var(--sans); color: var(--muted); }
   border-left: 3px solid var(--accent); border-radius: 6px; background: var(--wash); }
 .ta-summary h2 { margin: 0 0 0.6rem; font: 650 1.13rem/1.3 var(--sans); }
 .ta-summary p { margin: 0 0 0.7rem; font-size: 0.95rem; }
+/* The rail keeps a readable chapter name at rest instead of a numeral and a
+ * bare rule; the agent list opens on hover or focus. Below 72rem there is no
+ * room beside a 46rem column, so upstream's compact rail is left alone. */
+@media (min-width: 72rem) {
+  .contents { min-width: 7.5rem; }
+  .contents > ul > li > a .label { max-width: none; opacity: 1; }
+  .contents:not(:hover):not(:focus-within) ul ul { display: none; }
+}
 .ta-summary p:last-child { margin-bottom: 0; }
 .ta-summary__more { font: 0.85rem/1.4 var(--sans); }
 </style>"""
@@ -176,14 +216,30 @@ def _localise_agent_name(match: re.Match) -> str:
 
 def _localise_rating_after_label(match: re.Match) -> str:
     enum = match.group(2)
-    chinese = RATING_LABELS.get(enum.capitalize(), RATING_LABELS.get(enum, enum))
-    return f"{match.group(1)}{chinese}（{enum}）"
+    chinese = _ENUMS[enum.upper()]
+    return f"{match.group(1)}{chinese}（{enum.upper()}）"
+
+
+def _localise_enum(match: re.Match) -> str:
+    word = match.group(1)
+    chinese = _ENUMS[word.upper()]
+    return f"<strong>{chinese}（{word.upper()}）</strong>"
+
+
+def _shorten_nav(match: re.Match) -> str:
+    numeral, label = match.group(1), match.group(2)
+    short = _NAV_SHORT.get(label)
+    if not short:
+        return match.group(0)
+    return f'<span class="num">{numeral}</span> <span class="label">{short}</span>'
 
 
 def _localise_glossary(html: str) -> str:
     html = _AGENT_LABEL.sub(_localise_agent_name, html)
-    for old, new in _STRONG_PAIRS:
-        html = html.replace(old, new)
+    for english, chinese in SCHEMA_LABELS.items():
+        html = html.replace(f"<strong>{english}</strong>", f"<strong>{chinese}</strong>")
+    html = html.replace(FINAL_PROPOSAL, FINAL_PROPOSAL_ZH)
+    html = _STRONG_ENUM.sub(_localise_enum, html)
     html = _RATING_AFTER_LABEL.sub(_localise_rating_after_label, html)
     for english, chinese in _VENDOR_NAMES.items():
         html = html.replace(f'<span class="name">{english}</span>',
@@ -259,6 +315,7 @@ def present(html: str, language: str | None, name: str | None = None) -> str:
         if card:
             html = html.replace("</header>", "</header>\n" + card, 1)
     html = _localise_glossary(html)
+    html = _NAV_ENTRY.sub(_shorten_nav, html)
     if '<style id="ta-cn">' not in html:
         html = html.replace("</head>", _CN_STYLE + "\n</head>", 1)
     return html
