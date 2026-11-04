@@ -93,9 +93,9 @@ def test_the_ui_passes_sse_through(tmp_path):
                      worker=RecordingWorker(), engine_base="http://engine",
                      engine_token=ENGINE_TOKEN,
                      proxy_transport=httpx.ASGITransport(app=engine))
-    with TestClient(app) as client:
-        with client.stream("GET", "/api/events", headers=AUTH) as reply:
-            body = "".join(reply.iter_text())
+    with TestClient(app) as client, \
+            client.stream("GET", "/api/events", headers=AUTH) as reply:
+        body = "".join(reply.iter_text())
 
     assert reply.status_code == 200
     assert reply.headers["content-type"].startswith("text/event-stream")
