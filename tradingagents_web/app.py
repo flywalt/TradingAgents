@@ -13,7 +13,6 @@ from datetime import date
 from pathlib import Path
 
 import httpx
-
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.responses import (
     FileResponse,
@@ -23,10 +22,10 @@ from fastapi.responses import (
     Response,
     StreamingResponse,
 )
-from starlette.background import BackgroundTask
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, Field
+from starlette.background import BackgroundTask
 
 from tradingagents.agents.context import resolve_instrument_identity
 from tradingagents.dataflows.symbols import safe_ticker_component
