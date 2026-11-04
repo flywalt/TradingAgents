@@ -58,6 +58,7 @@
 | `tradingagents_web/labels.py` | 中文标签唯一来源：评级/内核节点/分析师映射/报告章节 |
 | `tradingagents_web/report_page.py` | 报告 HTML 的**服务时**本地化（磁盘产物不动） |
 | `tradingagents_web/search.py` | 模糊检索：代码/名称片段 → 建议（tushare stock_basic，24h 缓存，失败即空） |
+| `scripts/serve.sh` | M1 启动/停止脚本（engine 回环 + ui 对局域网，幂等，无守护） |
 | `scripts/report_lint.py` | 报告体检：无模型、确定性，检查读者最先会看的五类问题 |
 | `tradingagents_web/progress_graph.py` | 运行拓扑与宽/窄两套坐标，边语义 flow/debate/bypass |
 | `tradingagents_web/static/run-page.js` | 运行页脚本：流程图、事件时间线、计时器、重跑（一页一个 script） |
@@ -116,6 +117,7 @@
 | `tests/downstream/test_web_errors.py` | 错误分类 |
 | `tests/downstream/test_web_security.py` | token 比较、路径白名单 |
 | `tests/downstream/test_web_runner_worker.py` | 执行序列/产物/失败分类/worker 恢复 |
+| `tests/downstream/test_web_roles.py` | M1 分进程：engine 只出 API、ui 不跑任务、代理转发令牌、SSE 透传 |
 | `tests/downstream/test_web_api.py` | 鉴权/校验/队列/页面/SSE/文件越权/报告语言/流程图 |
 | `tests/downstream/test_web_labels.py` | 中文标签覆盖全部内核节点与评级枚举 |
 | `tests/downstream/test_web_search.py` | 模糊检索：代码/名称/排序/上限/数据源故障降级 |
