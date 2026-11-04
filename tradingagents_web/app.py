@@ -12,6 +12,8 @@ import os
 from datetime import date
 from pathlib import Path
 
+import httpx
+
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.responses import (
     FileResponse,
@@ -21,6 +23,7 @@ from fastapi.responses import (
     Response,
     StreamingResponse,
 )
+from starlette.background import BackgroundTask
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, Field
@@ -82,14 +85,25 @@ def create_app(
     read_token: str | None = None,
     dev_no_token: bool = False,
     kviewer_base: str | None = None,
+    role: str = "combined",
+    engine_base: str | None = None,
+    engine_token: str | None = None,
+    proxy_transport: httpx.AsyncBaseTransport | None = None,
 ) -> FastAPI:
     path = Path(db_path or os.environ.get("TRADINGAGENTS_WEB_DB")
                 or Path.home() / ".tradingagents" / "web" / "state.db")
     conn = db.connect(path)
     conn.close()
 
+    if role not in ("combined", "ui", "engine"):
+        raise ValueError(f"unknown role: {role!r}")
     token = token if token is not None else security.configured_token()
     read_token = read_token if read_token is not None else security.configured_read_token()
+    engine_token = (engine_token if engine_token is not None
+                    else os.environ.get("TRADINGAGENTS_ENGINE_TOKEN"))
+    if role == "engine" and engine_token:
+        # the engine answers to the service token the UI holds
+        token = engine_token
     token_value, read_value = token, read_token
     if not token and not dev_no_token:
         raise RuntimeError(
@@ -111,8 +125,11 @@ def create_app(
     app.state.kviewer_base = (kviewer_base if kviewer_base is not None
                               else security.kviewer_base())
 
-    if not getattr(app.state, "_started", False):
+    app.state.role = role
+    if role != "ui" and not getattr(app.state, "_started", False):
         app.state.started = background.start()
+    else:
+        app.state.started = []
 
     origins = security.cors_origins()
     if origins:
@@ -156,6 +173,72 @@ def create_app(
                        "action": info.action}},
             status_code=info.http_status,
         )
+
+    # ------------------------------------------------------------- split role
+    # A UI process owns the pages and forwards /api to the engine: one origin for
+    # the browser, the service token never leaves the server. An engine process
+    # owns the API only and refuses to render pages at all.
+    if role == "ui":
+        engine_url = (engine_base or os.environ.get("TRADINGAGENTS_ENGINE_URL")
+                      or "http://127.0.0.1:8502").rstrip("/")
+        service_token = engine_token or token_value or ""
+
+        def _forward_headers(request: Request) -> dict:
+            keep = {"accept", "content-type", "last-event-id"}
+            headers = {k: v for k, v in request.headers.items() if k.lower() in keep}
+            headers["authorization"] = f"Bearer {service_token}"
+            return headers
+
+        @app.get("/api/engine/health", dependencies=[Depends(require_read)])
+        async def engine_health():
+            try:
+                async with httpx.AsyncClient(transport=proxy_transport,
+                                             timeout=3) as client:
+                    reply = await client.get(f"{engine_url}/healthz")
+                return {"online": reply.status_code == 200}
+            except httpx.HTTPError:
+                return {"online": False}
+
+        @app.api_route("/api/{path:path}",
+                       methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
+                       dependencies=[Depends(require_read)])
+        async def proxy_api(path: str, request: Request):
+            body = await request.body()
+            # The client must outlive this handler: the body is streamed after
+            # the response object is returned, so both are closed in the
+            # background task rather than on return.
+            client = httpx.AsyncClient(transport=proxy_transport, timeout=None)
+            try:
+                upstream = await client.send(
+                    client.build_request(request.method, f"{engine_url}/api/{path}",
+                                         headers=_forward_headers(request),
+                                         params=request.query_params, content=body),
+                    stream=True,
+                )
+            except httpx.HTTPError:
+                await client.aclose()
+                return JSONResponse({"detail": "engine unreachable"}, status_code=502)
+
+            async def close_both():
+                await upstream.aclose()
+                await client.aclose()
+
+            passing = {"content-type", "cache-control", "x-accel-buffering"}
+            return StreamingResponse(
+                upstream.aiter_raw(), status_code=upstream.status_code,
+                headers={k: v for k, v in upstream.headers.items()
+                         if k.lower() in passing},
+                background=BackgroundTask(close_both),
+            )
+
+    if role == "engine":
+        @app.middleware("http")
+        async def api_only(request: Request, call_next):
+            path = request.url.path
+            if path.startswith("/api/") or path in ("/healthz", "/login"):
+                return await call_next(request)
+            return JSONResponse({"detail": "this process serves the API only"},
+                                status_code=404)
 
     # ------------------------------------------------------------ validation
     def _validated(payload: RunRequest) -> dict:

@@ -348,3 +348,19 @@ rating = run_rating(final)                                   # 五档 or REVIEW
 
 W1 额外断言：H3 的 `job.json` 含 `data_as_of`/`qfq_anchor`；H4 的只读 token 能读 `/api/runs` 但不能写；
 H5 在配置了 `KVIEWER_BASE_URL` 时报告页出现正确 `end=分析日` 的链接。
+
+
+## 16. 运行形态 M1：UI 与引擎分进程（同机）
+
+单机单用户下默认仍是 `combined`（一个进程）；需要"重启页面不打断任务"时切成两个角色：
+
+| 角色 | 命令 | 监听 | 职责 | 令牌 |
+| --- | --- | --- | --- | --- |
+| engine | `python -m tradingagents_web --role engine --port 8502` | **127.0.0.1**（强制回环）| 队列、worker、SQLite、报告与产物 | `TRADINGAGENTS_ENGINE_TOKEN`，缺省回退 `TRADINGAGENTS_WEB_TOKEN` |
+| ui | `python -m tradingagents_web --role ui --port 8501 --engine http://127.0.0.1:8502` | 0.0.0.0 | 页面、登录、把 `/api/*` 反向代理给引擎；**不启动 worker** | 浏览器用 `TRADINGAGENTS_WEB_TOKEN` |
+
+- UI 的代理保留 `Accept`/`Last-Event-ID`，SSE 原样透传；浏览器只认识 UI 一个源，服务令牌不出服务端。
+- 引擎进程只有 API：页面路径一律 404（`--role engine` 还禁止绑定非回环地址）。
+- 启停：`scripts/serve.sh up|down|status`（幂等；`up` 打印带令牌的登录地址）。脚本**不做守护**，
+  面向"本机资源紧张、按需启动"的场景；浏览器页面本身无法启动进程，需要由带命令执行能力的面板调用该脚本。
+- 队列与恢复不依赖 UI：UI 挂掉时任务仍在引擎队列里继续，恢复后页面直接看到结果。
