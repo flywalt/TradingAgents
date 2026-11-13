@@ -76,7 +76,88 @@ curl -fsS -N -b <cookie> https://<域名>/api/runs/<id>/events | head -2   # SSE
 curl -fsS -o /dev/null -w '%{http_code}\n' http://127.0.0.1:8502/        # 404（引擎不出页面）
 ```
 
-## 6. 回滚
+## 6. 最终整合方案（C）：一台北京 VPS 跑全部
+
+拓扑：`Caddy(443) → UI(8501, loopback) → engine(8502, loopback) → RSSHub(1200, loopback)`。
+RSSHub 只有引擎会访问，所以只绑回环；公网只开 80/443。
+
+### 6.1 进程与端口
+
+| 组件 | 起法 | 监听 | 内存（实测/估计）|
+| --- | --- | --- | --- |
+| Caddy | `systemctl enable --now caddy` | 0.0.0.0:80/443 | ~40 MB |
+| UI | `systemctl enable --now tradingagents-ui` | 127.0.0.1:8501 | ~160 MB |
+| engine | `systemctl enable --now tradingagents-engine` | 127.0.0.1:8502 | ~210 MB 峰值 |
+| RSSHub | `docker compose -f deploy/rsshub/docker-compose.yml up -d` | 127.0.0.1:1200 | ~150–300 MB |
+
+合计峰值约 0.6–0.8 GB；4c4g 富余很大，磁盘 20–40 GB 足够（代码+venv 约 0.5 GB，
+RSSHub 镜像约 1 GB，运行产物每天几 MB）。
+
+### 6.2 一次性上线清单
+
+```bash
+# 0) 系统
+sudo apt update && sudo apt install -y caddy git python3-venv docker.io docker-compose-plugin rsync
+sudo timedatectl set-timezone Asia/Shanghai
+
+# 1) 代码（用独立用户跑业务）
+sudo useradd -r -m -d /opt/TradingAgents tradingagents
+sudo -u tradingagents git clone <repo> /opt/TradingAgents
+cd /opt/TradingAgents && sudo -u tradingagents python3 -m venv .venv
+sudo -u tradingagents .venv/bin/pip install -e .
+
+# 2) 密钥
+sudo -u tradingagents cp deploy/env.example .env && sudo -u tradingagents vi .env
+sudo chmod 600 .env
+#   两份不同的令牌：WEB（浏览器）与 ENGINE（UI→引擎）
+#   RSSHUB_TOKEN 与 RSSHub 的 ACCESS_KEY 必须一致
+
+# 3) 服务
+sudo cp deploy/systemd/tradingagents-*.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now tradingagents-engine tradingagents-ui
+
+# 4) RSSHub
+sudo -u tradingagents env $(grep RSSHUB_TOKEN .env | xargs) \
+  docker compose -f deploy/rsshub/docker-compose.yml up -d
+
+# 5) 入口（域名 A 记录先指向这台机器的 IP）
+sudo cp deploy/caddy/Caddyfile.vps /etc/caddy/Caddyfile
+sudo tee /etc/caddy/stock.env >/dev/null <<'E'
+STOCK_DOMAIN=stock.example.com
+CADDY_EMAIL=you@example.com
+E
+sudo systemctl edit caddy   # 在 [Service] 里加 EnvironmentFile=/etc/caddy/stock.env
+sudo systemctl restart caddy
+
+# 6) 防火墙
+sudo ufw default deny incoming && sudo ufw allow 80,443/tcp && sudo ufw enable
+```
+
+### 6.3 从本地迁移（停机搬运，避免 SQLite 双写）
+
+```bash
+# 本机：先停，保证状态一致
+scripts/serve.sh down
+rsync -a ~/.tradingagents/ root@vps:/home/tradingagents/.tradingagents/   # 以实际业务用户为准
+scp .env root@vps:/opt/TradingAgents/.env
+# VPS：起服务、验证、再把 DNS 切过去
+```
+
+迁移后可以继续用两台：**同一时刻只能有一个 engine** 写 `state.db`；家用机作为冷备，
+需要时再反向搬一次。
+
+### 6.4 日常运维
+
+| 事项 | 做法 |
+| --- | --- |
+| 备份 | `deploy/backup.sh`（结果 + state.db + .env，保留 14 天），挂 cron 03:30 |
+| 日志 | journald（两个服务）+ Caddy 自带滚动；`journalctl -u tradingagents-engine -f` |
+| 升级 | `git pull && .venv/bin/pip install -e . && systemctl restart tradingagents-{engine,ui}` |
+| 换令牌 | 改 `.env` 两处 → `systemctl restart` 两个服务，浏览器重新登录 |
+| 磁盘告警 | `du -sh ~/.tradingagents/logs`；产物按需清理（每次约 0.44 MB）|
+
+## 7. 回滚
 
 停 Caddy 的 site block 或 `systemctl stop caddy`，UI/引擎仍在回环上；本机可随时退回
 `combined` 单进程：`python -m tradingagents_web`（8501）。数据只在 `~/.tradingagents`，

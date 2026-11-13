@@ -1,0 +1,25 @@
+# RSSHub sidecar: the only consumer is the engine, so it listens on loopback.
+#   docker compose -f deploy/rsshub/docker-compose.yml up -d
+# ACCESS_KEY must equal RSSHUB_TOKEN in .env; the engine sends it as ?key=.
+services:
+  rsshub:
+    image: diygod/rsshub:latest
+    container_name: rsshub
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:1200:1200"
+    environment:
+      NODE_ENV: production
+      CACHE_TYPE: memory
+      ACCESS_KEY: ${RSSHUB_TOKEN:?set RSSHUB_TOKEN in the environment or .env}
+      TZ: Asia/Shanghai
+      # A-share routes are plain HTTP fetches; no headless browser needed.
+      # If a future route needs puppeteer, add PUPPETEER_WS_ENDPOINT and ~1 GB RAM.
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:1200/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
