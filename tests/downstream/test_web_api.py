@@ -394,3 +394,20 @@ def test_the_login_cookie_stays_plain_on_lan_http(client):
     response = client.get("/login", params={"token": TOKEN}, follow_redirects=False)
 
     assert "secure" not in response.headers["set-cookie"].lower()
+
+
+def test_the_login_form_posts_the_token_so_it_never_reaches_a_log(client):
+    response = client.post("/login", data={"token": TOKEN}, follow_redirects=False)
+
+    assert response.status_code == 303
+    assert response.cookies.get("tg_web_token") == TOKEN
+
+
+def test_the_login_form_rejects_a_wrong_token(client):
+    assert client.post("/login", data={"token": "nope"}).status_code == 401
+
+
+def test_the_login_page_posts_rather_than_putting_the_token_in_the_url(client):
+    page = client.get("/history", headers={"Accept": "text/html"})
+
+    assert '<form method="post" action="/login">' in page.text

@@ -364,3 +364,18 @@ H5 在配置了 `KVIEWER_BASE_URL` 时报告页出现正确 `end=分析日` 的�
 - 启停：`scripts/serve.sh up|down|status`（幂等；`up` 打印带令牌的登录地址）。脚本**不做守护**，
   面向"本机资源紧张、按需启动"的场景；浏览器页面本身无法启动进程，需要由带命令执行能力的面板调用该脚本。
 - 队列与恢复不依赖 UI：UI 挂掉时任务仍在引擎队列里继续，恢复后页面直接看到结果。
+
+### 16.1 公网部署（`trade.dafeis.com`）
+
+VPS 上 Caddy 是唯一入口，只反代 UI；UI 与引擎都绑 `127.0.0.1`，引擎仍单实例。部署手册见
+`deploy/README.md`（含 Caddyfile、DNS、令牌、迁移、验证、排障）。
+
+与局域网形态的三处差异：
+
+1. **UI 只监听回环**：`--role ui` 默认 `0.0.0.0` 以便局域网直连；VPS 的 systemd 单元显式传
+   `--host 127.0.0.1`，让 Caddy 成为唯一入口。
+2. **登录用表单（POST）**：`POST /login` 从请求体读口令，令牌不进访问日志；`GET /login?token=`
+   保留给局域网便捷链接（`scripts/serve.sh` 打印的就是它）。两者都把 cookie 标记为 `Secure`
+   当请求经 TLS 到达（`X-Forwarded-Proto`，uvicorn 只信任回环来的代理头）。
+3. **进程守护**：家用机按需起停（`scripts/serve.sh`，无守护）；VPS 由 systemd `Restart=always`
+   托管，另有每天 03:30 的备份 timer。
