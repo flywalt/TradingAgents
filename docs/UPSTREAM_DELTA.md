@@ -102,6 +102,9 @@
 | D-0052 | `feat(web)` 分支 `feature/web-report-l10n-graph` | feat | 报告页服务时本地化（`report_page.present`）+ 运行页拓扑图（`progress_graph.topology` + `static/run-page.js`）+ 中文标签单一来源 `labels.py` | 无 | 无 | 新增 25 项测试，全量 1805 passed |
 | D-0053 | `feat(web)` 分支 `feature/web-report-summary` | feat | 中文报告：注入 CJK 排版（ta-cn 样式）+ 核心结论卡（PM 结论摘录置顶，锚点回第五节）；宽屏流程图分析师行动态居中于多头研究员 | 无 | 无 | 新增 10 项测试 |
 | D-0054 | `feat(web)` 分支 `feature/graph-v2.1`（已合并） | feat | 运行图 v2：横向阶段流/窄屏脊骨、三线语言（主线/辩论⇄/反馈点线）、分组容器统一边框与等距、固定端口、区域单线交接（一次事件式流动）、卡片三态呼吸；检索 `search.py` 与简称优先为独立提交 | 无 | 无 | 图/检索/布局新增 34 项测试，全量 1846 passed |
+| D-0055 | `feat(web)` 分支 `feature/m1-split`（`b9e5bba`…`3cd0739`） | feat | UI 与引擎拆成两个角色进程（`--role ui|engine`）：引擎独占队列/worker/SQLite 并强制回环，UI 出页面并把 `/api` 流式反代给引擎（注入服务令牌、透传 SSE 与 `Last-Event-ID`）；`scripts/serve.sh up\|down\|status` 幂等起停 | 无 | 无 | 新增 6 项测试，全量 1876 passed |
+| D-0056 | `feat(deploy)`（`8d3c8f1`、`5687459`、`76eb429`） | feat | Caddy 入口与 HTTPS 感知 cookie（`X-Forwarded-Proto` → `Secure`）；systemd 单元、RSSHub 边车、备份脚本、env 模板；单台 VPS 的上线/迁移手册。Caddy 站点配置不留在仓库（集中配置管理） | 无 | 无 | 新增 2 项测试，全量 1878 passed |
+| D-0057 | `chore(deploy)` 分支 `chore/vps-deploy-dafeis` | chore | 公网部署定稿：登录表单改为 POST（口令不进反代访问日志，`GET /login?token=` 保留给局域网）、uvicorn 显式信任回环代理头、UI 单元绑回环、备份 timer、`deploy/README.md` 按 `trade.dafeis.com` 写实（含 Caddyfile） | 无 | 无 | 新增 3 项测试，全量 1881 passed |
 
 十余条下游提交合计新增代码与文档，**0 行上游改动**。下游与上游的唯一耦合是文档里登记的"脆弱耦合"，
 现在由 `tests/downstream/test_sync_guard.py`（12 组断言）机械锁定。
