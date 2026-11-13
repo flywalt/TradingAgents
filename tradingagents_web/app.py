@@ -315,9 +315,13 @@ def create_app(
             raise HTTPException(status_code=401, detail="bad token")
         response = RedirectResponse("/", status_code=303)
         # thirty days: a LAN shell should survive a browser restart, not
-        # greet its only user with "token required" every morning
+        # greet its only user with "token required" every morning. Behind TLS
+        # the cookie is marked Secure; the scheme is read from the proxy header
+        # because uvicorn terminates plain HTTP behind Caddy.
+        secure = (request.url.scheme == "https"
+                  or request.headers.get("x-forwarded-proto", "").lower() == "https")
         response.set_cookie("tg_web_token", token, httponly=True, samesite="lax",
-                            max_age=30 * 24 * 3600)
+                            secure=secure, max_age=30 * 24 * 3600)
         return response
 
     @app.get("/healthz")
