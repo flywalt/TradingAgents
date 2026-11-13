@@ -8,7 +8,8 @@ Type=simple
 User=tradingagents
 WorkingDirectory=/opt/TradingAgents
 EnvironmentFile=/opt/TradingAgents/.env
-ExecStart=/opt/TradingAgents/.venv/bin/python -m tradingagents_web --role ui --port 8501 --engine http://127.0.0.1:8502
+# loopback too: Caddy is the only thing that should reach this port
+ExecStart=/opt/TradingAgents/.venv/bin/python -m tradingagents_web --role ui --host 127.0.0.1 --port 8501 --engine http://127.0.0.1:8502
 Restart=always
 RestartSec=3
 # the UI is stateless; Caddy fronts it
