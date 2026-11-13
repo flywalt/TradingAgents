@@ -24,6 +24,7 @@
 | `docs/MARKET_PROFILES.md` | **多市场 Profile**：UPSTREAM_DEFAULT / CN_A_SHARE、识别规则、隔离、测试计划 |
 | `docs/EXTENSIONS.md` | **本地扩展可审计清单**（模块/测试/配置键/补丁，脚本强制同步） |
 | `docs/B4_INTERACTION_SPEC.md` | Web 接入前的上游交互契约（输入/输出/状态机/API 草案） |
+| `deploy/README.md` | VPS 部署手册：Caddy → UI → 引擎 → RSSHub 单机拓扑、令牌、迁移、验证、运维、排障 |
 
 ---
 
