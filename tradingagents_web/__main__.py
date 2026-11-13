@@ -10,6 +10,7 @@ Three roles, one codebase:
 from __future__ import annotations
 
 import argparse
+import os
 
 import uvicorn
 
@@ -43,7 +44,12 @@ def main(argv=None) -> int:
 
     app = create_app(db_path=args.db, dev_no_token=args.dev_no_token,
                      role=args.role, engine_base=args.engine)
-    uvicorn.run(app, host=host, port=port, workers=1, log_level="info")
+    # Behind Caddy on the same host the real scheme and client address arrive
+    # as proxy headers from loopback; nothing else is trusted. Override
+    # FORWARDED_ALLOW_IPS when the proxy lives on another machine (a tunnel).
+    uvicorn.run(app, host=host, port=port, workers=1, log_level="info",
+                proxy_headers=True,
+                forwarded_allow_ips=os.environ.get("FORWARDED_ALLOW_IPS", "127.0.0.1"))
     return 0
 
 

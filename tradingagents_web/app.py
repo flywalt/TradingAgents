@@ -11,6 +11,7 @@ import json
 import os
 from datetime import date
 from pathlib import Path
+from urllib.parse import parse_qs
 
 import httpx
 from fastapi import Depends, FastAPI, HTTPException, Request
@@ -300,7 +301,7 @@ def create_app(
    color: #fff; font: inherit; cursor: pointer; }}
  p {{ margin: 0; color: #6b7280; font-size: .85rem; }}
 </style></head><body>
-<form method="get" action="/login">
+<form method="post" action="/login">
  <h1>TradingAgents CN</h1>
  <input name="token" type="password" placeholder="访问口令" autofocus required>
  <button type="submit">进入</button>
@@ -308,21 +309,36 @@ def create_app(
 </form></body></html>""", status_code=401)
 
     # ---------------------------------------------------------------- routes
-    @app.get("/login")
-    def login(request: Request, token: str = ""):
-        """Set the access cookie from a token in the URL (bookmark-friendly on LAN)."""
-        if not (security.token_matches(token, token_value) or security.token_matches(token, read_value)):
+    def _grant(request: Request, token: str) -> RedirectResponse:
+        if not (security.token_matches(token, token_value)
+                or security.token_matches(token, read_value)):
             raise HTTPException(status_code=401, detail="bad token")
         response = RedirectResponse("/", status_code=303)
-        # thirty days: a LAN shell should survive a browser restart, not
-        # greet its only user with "token required" every morning. Behind TLS
-        # the cookie is marked Secure; the scheme is read from the proxy header
-        # because uvicorn terminates plain HTTP behind Caddy.
+        # thirty days: a shell should survive a browser restart, not greet its
+        # only user with "token required" every morning. Behind TLS the cookie
+        # is marked Secure; the scheme is read from the proxy header because
+        # uvicorn terminates plain HTTP behind Caddy.
         secure = (request.url.scheme == "https"
                   or request.headers.get("x-forwarded-proto", "").lower() == "https")
         response.set_cookie("tg_web_token", token, httponly=True, samesite="lax",
                             secure=secure, max_age=30 * 24 * 3600)
         return response
+
+    @app.post("/login")
+    async def login_form(request: Request):
+        """The form path: the token travels in the body, so a public reverse
+        proxy never records it in an access log. Parsed by hand to keep
+        python-multipart out of the dependency list."""
+        body = (await request.body()).decode("utf-8", "replace")
+        token = parse_qs(body).get("token", [""])[0]
+        return _grant(request, token)
+
+    @app.get("/login")
+    def login(request: Request, token: str = ""):
+        """Set the cookie from a token in the URL. Convenient on a LAN where the
+        only reader of the proxy log is its owner; on a public host use the
+        form, since query strings are logged."""
+        return _grant(request, token)
 
     @app.get("/healthz")
     def healthz():
