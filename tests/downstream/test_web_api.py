@@ -379,3 +379,18 @@ def test_the_login_cookie_survives_a_browser_restart(client):
 
     cookie = response.headers.get("set-cookie", "")
     assert "Max-Age=2592000" in cookie          # thirty days, not a session
+
+
+def test_the_login_cookie_is_secure_behind_tls(client):
+    """Caddy terminates TLS, so the scheme rides in X-Forwarded-Proto."""
+    response = client.get("/login", params={"token": TOKEN},
+                          headers={"X-Forwarded-Proto": "https"},
+                          follow_redirects=False)
+
+    assert "secure" in response.headers["set-cookie"].lower()
+
+
+def test_the_login_cookie_stays_plain_on_lan_http(client):
+    response = client.get("/login", params={"token": TOKEN}, follow_redirects=False)
+
+    assert "secure" not in response.headers["set-cookie"].lower()

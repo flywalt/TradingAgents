@@ -1,0 +1,36 @@
+# LAN shell: Caddy terminates TLS with its own CA, the UI listens on loopback.
+#   caddy run --config deploy/caddy/Caddyfile.lan
+# Trust the CA once per browser:  caddy trust   (or import the root from
+# ~/.local/share/caddy/pki/authorities/local/root.crt on phones)
+{
+	# 换成你想在局域网里用的名字；保持与 hosts/DNS 一致
+	# 也可以直接写 IP，但证书会为它单独签发
+	admin off
+}
+
+stock.lan {
+	tls internal
+
+	encode zstd gzip
+
+	# the shell is single-user and always fresh: never cache pages or the API
+	header {
+		Cache-Control "no-store"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "no-referrer"
+		-Server
+	}
+
+	# SSE must not be buffered; everything else is a plain reverse proxy
+	reverse_proxy 127.0.0.1:8501 {
+		flush_interval -1
+		header_up X-Real-IP {remote_host}
+	}
+
+	log {
+		output file {$CADDY_LOG_DIR:/var/log/caddy}/stock-lan.log {
+			roll_size 10MiB
+			roll_keep 3
+		}
+	}
+}

@@ -1,0 +1,19 @@
+[Unit]
+Description=TradingAgents web UI (pages + /api proxy)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=tradingagents
+WorkingDirectory=/opt/TradingAgents
+EnvironmentFile=/opt/TradingAgents/.env
+ExecStart=/opt/TradingAgents/.venv/bin/python -m tradingagents_web --role ui --port 8501 --engine http://127.0.0.1:8502
+Restart=always
+RestartSec=3
+# the UI is stateless; Caddy fronts it
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
