@@ -62,7 +62,7 @@ sudo apt install -y docker-compose-v2 || sudo apt install -y docker-compose-plug
 
 ```bash
 sudo useradd -r -m -d /opt/TradingAgents tradingagents 2>/dev/null || true
-sudo -u tradingagents git clone https://github.com/<你的用户名>/TradingAgents.git /opt/TradingAgents
+sudo -u tradingagents git clone https://github.com/flywalt/TradingAgents.git /opt/TradingAgents
 cd /opt/TradingAgents
 sudo -u tradingagents python3 -m venv .venv
 sudo -u tradingagents .venv/bin/pip install -e .
