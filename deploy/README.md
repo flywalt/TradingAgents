@@ -3,6 +3,9 @@
 Caddy 只做入口（TLS/HTTP2/日志）；UI 出页面并把 `/api` 转给引擎；引擎只监听回环、
 独占 SQLite 与队列。三者可以放在一台机器，也可以分开放（见下方拓扑）。
 
+> Caddy 的站点配置**不在本仓库**：由集中配置管理（单一来源），本仓库只保留
+> systemd 单元、RSSHub 边车、备份脚本与环境模板。
+
 ## 1. 三种拓扑
 
 | 拓扑 | 在哪跑 | 优点 | 注意 |
@@ -34,8 +37,7 @@ sudo cp deploy/systemd/tradingagents-*.service /etc/systemd/system/
 sudo systemctl daemon-reload
 sudo systemctl enable --now tradingagents-engine tradingagents-ui
 
-# 4) Caddy
-sudo cp deploy/caddy/Caddyfile.vps /etc/caddy/Caddyfile   # 或 .lan
+# 4) Caddy：站点配置由集中配置管理下发，不在此仓库
 sudo systemctl reload caddy
 ```
 
@@ -121,14 +123,7 @@ sudo systemctl enable --now tradingagents-engine tradingagents-ui
 sudo -u tradingagents env $(grep RSSHUB_TOKEN .env | xargs) \
   docker compose -f deploy/rsshub/docker-compose.yml up -d
 
-# 5) 入口（域名 A 记录先指向这台机器的 IP）
-sudo cp deploy/caddy/Caddyfile.vps /etc/caddy/Caddyfile
-sudo tee /etc/caddy/stock.env >/dev/null <<'E'
-STOCK_DOMAIN=stock.example.com
-CADDY_EMAIL=you@example.com
-E
-sudo systemctl edit caddy   # 在 [Service] 里加 EnvironmentFile=/etc/caddy/stock.env
-sudo systemctl restart caddy
+# 5) 入口：域名 A 记录先指向这台机器的 IP；Caddy 站点配置由集中配置管理下发
 
 # 6) 防火墙
 sudo ufw default deny incoming && sudo ufw allow 80,443/tcp && sudo ufw enable
