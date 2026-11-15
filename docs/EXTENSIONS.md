@@ -96,6 +96,7 @@
 | 文件 | 覆盖 |
 | --- | --- |
 | `tests/downstream/test_audit_inventory.py` | 本文件与代码同步 |
+| `tests/downstream/test_state_home.py` | D-0058：`TRADINGAGENTS_HOME` 开关驱动 default_config 三路径与 web db 兜底；特异目录变量优先 |
 | `tests/downstream/test_bootstrap.py` | 注册门面、签名、幂等、严格隔离 |
 | `tests/downstream/test_registration.py` | 注册与回滚 |
 | `tests/downstream/test_config.py` | 配置合并、严格模式、Profile、目录 |
