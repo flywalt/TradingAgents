@@ -105,6 +105,7 @@
 | D-0055 | `feat(web)` 分支 `feature/m1-split`（`b9e5bba`…`3cd0739`） | feat | UI 与引擎拆成两个角色进程（`--role ui|engine`）：引擎独占队列/worker/SQLite 并强制回环，UI 出页面并把 `/api` 流式反代给引擎（注入服务令牌、透传 SSE 与 `Last-Event-ID`）；`scripts/serve.sh up\|down\|status` 幂等起停 | 无 | 无 | 新增 6 项测试，全量 1876 passed |
 | D-0056 | `feat(deploy)`（`8d3c8f1`、`5687459`、`76eb429`） | feat | Caddy 入口与 HTTPS 感知 cookie（`X-Forwarded-Proto` → `Secure`）；systemd 单元、RSSHub 边车、备份脚本、env 模板；单台 VPS 的上线/迁移手册。Caddy 站点配置不留在仓库（集中配置管理） | 无 | 无 | 新增 2 项测试，全量 1878 passed |
 | D-0057 | `chore(deploy)` 分支 `chore/vps-deploy-dafeis` | chore | 公网部署定稿：登录表单改为 POST（口令不进反代访问日志，`GET /login?token=` 保留给局域网）、uvicorn 显式信任回环代理头、UI 单元绑回环、备份 timer、`deploy/README.md` 按 `trade.dafeis.com` 写实（含 Caddyfile） | 无 | 无 | 新增 3 项测试，全量 1881 passed |
+| D-0058 | 分支 `chore/vps-deploy`（`3d9562a` `upstream-patch` + 本条 `fix(web)`） | fix | `TRADINGAGENTS_HOME` 环境变量优先于 `~/.tradingagents`：`default_config` 三处默认路径与 web 层 SQLite 兜底（新 `default_db_path()`）跟随单一开关，生产沙箱（vps-deploy，`ReadWritePaths=/srv/<app>/data`）内状态全量归位；特异目录变量仍优先 | `tradingagents/default_config.py`（1 行） | 低：上游极少改该行；**退路**——零补丁可用 `TRADINGAGENTS_RESULTS_DIR`/`_CACHE_DIR`/`_MEMORY_LOG_PATH`/`_WEB_DB` 四变量直配得到同样布局 | `tests/downstream/test_state_home.py` 新增 4 项 |
 
 十余条下游提交合计新增代码与文档，**0 行上游改动**。下游与上游的唯一耦合是文档里登记的"脆弱耦合"，
 现在由 `tests/downstream/test_sync_guard.py`（12 组断言）机械锁定。

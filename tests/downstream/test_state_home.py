@@ -25,6 +25,15 @@ def test_tradingagents_home_env_overrides_default(monkeypatch, tmp_path):
     assert importlib.reload(dc).DEFAULT_CONFIG["results_dir"] == cfg["results_dir"]
 
 
+def test_default_db_path_follows_home(monkeypatch, tmp_path):
+    """D-0058：web 层 SQLite 兜底路径跟随 TRADINGAGENTS_HOME（沙箱内不许写 ~）。"""
+    monkeypatch.setenv("TRADINGAGENTS_HOME", str(tmp_path))
+    monkeypatch.delenv("TRADINGAGENTS_WEB_DB", raising=False)
+    from tradingagents_web.app import default_db_path
+
+    assert default_db_path() == Path(tmp_path) / "web" / "state.db"
+
+
 def test_specific_dir_env_still_beats_home(monkeypatch, tmp_path):
     """特异目录变量优先于 TRADINGAGENTS_HOME（部署只用 home 开关时的兜底语义）。"""
     monkeypatch.setenv("TRADINGAGENTS_HOME", str(tmp_path / "home"))

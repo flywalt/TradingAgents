@@ -49,6 +49,13 @@ MAX_QUEUED = 3
 RATING_LABELS = labels.RATING_LABELS
 
 
+def default_db_path() -> Path:
+    """SQLite 兜底路径：跟随 D-0058 的 TRADINGAGENTS_HOME 开关（生产沙箱归位到 /srv/<app>/data）。"""
+    from tradingagents.default_config import _TRADINGAGENTS_HOME
+    home = os.getenv("TRADINGAGENTS_HOME") or _TRADINGAGENTS_HOME
+    return Path(home) / "web" / "state.db"
+
+
 def served_report(path: Path) -> tuple[Path, str]:
     """Pick the file to hand the browser, and the type to declare for it.
 
@@ -90,8 +97,7 @@ def create_app(
     engine_token: str | None = None,
     proxy_transport: httpx.AsyncBaseTransport | None = None,
 ) -> FastAPI:
-    path = Path(db_path or os.environ.get("TRADINGAGENTS_WEB_DB")
-                or Path.home() / ".tradingagents" / "web" / "state.db")
+    path = db_path or os.environ.get("TRADINGAGENTS_WEB_DB") or default_db_path()
     conn = db.connect(path)
     conn.close()
 
