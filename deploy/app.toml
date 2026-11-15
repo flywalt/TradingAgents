@@ -1,0 +1,42 @@
+# TradingAgents 的部署自描述 —— vps-deploy 标准（接入指南：~/projects/vps-deploy-standard.md）
+# 工具：dev ~/projects/vps-ops / VPS /srv/vps-ops；命令：vps-deploy tradingagents
+name = "tradingagents"
+runtime = "python"
+repo = "https://github.com/flywalt/TradingAgents.git"
+branch = "main"                      # fork 只有 main（无 master）
+
+build = [
+  "python3 -m venv .venv",
+  ".venv/bin/pip install -i https://pypi.tuna.tsinghua.edu.cn/simple -r requirements-downstream.txt",
+  ".venv/bin/pip install -i https://pypi.tuna.tsinghua.edu.cn/simple -e .",
+  ".venv/bin/python -c 'import tradingagents_web.app'",   # 缺依赖在 build 期暴露，不留给健康检查
+]
+
+domain = "ta.dafeis.com"
+spa = false                           # 服务端渲染多页应用：无 dist，全部请求反代给 ui
+api_paths = ["/*"]                    # /、/history、/runs/*、/static/* 都是动态页，catch-all 必须反代而非 file_server
+static_root = "dist"                  # 占位：handle /* 在前，此 root 永不命中（见上行注释）
+
+env_required = ["TRADINGAGENTS_WEB_TOKEN", "OPENAI_COMPATIBLE_API_KEY", "TUSHARE_TOKEN"]
+limits = { memory = "600M", cpu = "200%" }
+
+backup = { paths = ["data/web/state.db", "data/memory", "data/logs"], keep = 7, cron = "0 20 * * *" }
+
+[[units]]
+name = "engine"
+start = "-m tradingagents_web --role engine --host 127.0.0.1 --port 8802"
+port = 8802
+health = "/healthz"
+
+[[units]]
+name = "ui"
+start = "-m tradingagents_web --role ui --host 127.0.0.1 --port 8801 --engine http://127.0.0.1:8802"
+port = 8801
+health = "/healthz"
+public = true
+depends_on = ["engine"]
+
+[[external]]
+name = "rsshub"
+url = "http://127.0.0.1:1200"
+note = "新闻源旁路，缺了降级不阻断；暂不部署（df-tc1 无 docker），再上时见 deploy/rsshub/"
