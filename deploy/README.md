@@ -41,10 +41,13 @@ vps-apps                        # 全机应用清单
 
 ## 已知边界（运行手册）
 
-- ui 单元 `Requires=engine`：engine 被 OOM 杀掉时 systemd 会连带停 ui；engine 靠 `Restart=always`
-  自愈，**ui 若停在 inactive，跑一次 `vps-deploy tradingagents` 拉起**。
-- `limits` 当前 600M 总量（engine/ui 各 300M）。跑大任务若见 `journalctl` 里 `Killed`（OOM），
-  把 `app.toml` 的 `limits.memory` 提到 `800M` 重发一次。
+- ui 单元 `Requires=engine`。实测（SIGKILL engine 主进程）：engine `Restart=always` 秒级自愈、
+  **ui 全程 active**——快速自愈下 `Requires` 连锁不会造成停站；OOM 路径未实测，若见 ui 停在
+  inactive，跑一次 `vps-deploy tradingagents` 拉起。
+- `limits` 已按终审裁定提到 **800M 总量**（engine/ui 各 400M；idle 实测 146M/116M，旧手册记录过
+  单次真实分析 engine 峰值 ~210M，600M 均分余量过薄）。仍见 `journalctl` 里 `Killed`（OOM）就继续上调。
+- 回滚演练的坏 commit 会短暂经过 `main`——这是拉取式部署的固有形态（工具只从 `origin/main` 取代码），
+  bisect 时注意跳过标注 `test(deploy)` 的演练提交。
 
 ## RSSHub（暂缓）
 

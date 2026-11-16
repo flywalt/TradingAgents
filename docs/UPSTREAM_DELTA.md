@@ -157,6 +157,7 @@
 | `_SECTIONS` 报告结构 | `reporting.py` | 若自建 writer 需对齐 | 报告缺失/格式分裂 | 报告渲染测试 |
 | `render_report` 的标记字面量（`<html lang>`、`<p class="date">`、`<dt>` 标签、`aria-label="Sections"`、`<a class="to-top">`、`<span class="rating "`） | `report_html.py` | Web 层在**服务时**把报告页首本地化，磁盘产物不动 | 页面静默退回英文（不报错） | `tests/downstream/test_web_report_page.py::test_the_markup_we_match_is_still_produced_upstream` |
 | `rating.RATINGS_5_TIER` / `REVIEW` | `agents/rating.py` | 全链路评级契约 | 记忆/回测统计口径分裂 | 复用即可，勿改 |
+| `_TRADINGAGENTS_HOME`（**私有**模块常量） | `default_config.py:3` | web 层 db 兜底路径跟随 D-0058 的状态归位开关 | 上游改名 → db 静默落回 `~/.tradingagents`（health 仍全绿，备份失真） | `tests/downstream/test_state_home.py::test_default_db_path_follows_home` |
 
 ---
 

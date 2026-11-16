@@ -8,7 +8,7 @@
 ## 1. 一句话总览
 
 在**不修改上游分析框架**的前提下，新增了一个独立数据层（Tushare）、A 股身份/规则、多市场 Profile、
-运行元数据与同步治理。上游改动仅 3 个文件、2 个 `upstream-patch:` 提交；其余全部为新增文件。
+运行元数据与同步治理。上游改动仅 5 个文件（其中 3 个经 `upstream-patch:` 提交）；其余大部分为新增文件。
 
 ## 2. 模块清单（全部为新增文件）
 
@@ -189,6 +189,7 @@
 | `tradingagents/agents/tools.py` | 1 行调用改为 `route_to_vendor(...)` | 同上；工具名/Schema/描述/错误语义不变 | D-0022 |
 | `tests/test_graph_end_to_end.py` | 2 行：期望的数据路径集合跟随路由 | 路由改动的必然连带 | D-0027 |
 | `tradingagents/default_config.py` | 1 行：`_TRADINGAGENTS_HOME = os.getenv("TRADINGAGENTS_HOME") or ~/.tradingagents` | 生产沙箱（vps-deploy）要求运行时状态全量归位到 `/srv/<app>/data`；特异目录变量仍优先 | D-0058 |
+| `README.md` | 末尾 2 行部署注记（docs 提交） | 标注发布已由 vps-deploy 标准接管 | D-0059 |
 
 ## 7. 入口
 

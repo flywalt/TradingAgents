@@ -5,6 +5,17 @@ default_config 的三处默认路径（results/cache/memory）必须跟随单一
 """
 
 import importlib
+
+import pytest
+
+
+@pytest.fixture(autouse=True)
+def _restore_default_config():
+    """reload 会改写模块级常量；teardown 时 monkeypatch 已还原（autouse 先建后拆），
+    裸 reload 即可重算回原始值，避免用例顺序影响他人。"""
+    yield
+    import tradingagents.default_config as dc
+    importlib.reload(dc)
 from pathlib import Path
 
 
@@ -53,3 +64,18 @@ def test_tradingagents_home_defaults_to_user_home(monkeypatch, tmp_path):
     home = importlib.reload(dc)._TRADINGAGENTS_HOME
     assert home.endswith(".tradingagents")
     assert str(tmp_path) not in home
+
+
+def test_create_app_consumes_default_db_path(tmp_path):
+    """终审 #9：钉住真正的接线缝——create_app 必须消费 default_db_path（沙箱归位），
+    防止有人把 app.py:100 改回 Path.home() 而其余测试仍绿。"""
+    import os
+    os.environ["TRADINGAGENTS_HOME"] = str(tmp_path)
+    os.environ.pop("TRADINGAGENTS_WEB_DB", None)
+    try:
+        from tradingagents_web.app import create_app
+        app = create_app(role="ui", dev_no_token=True)
+        assert (tmp_path / "web" / "state.db").exists(), \
+            "create_app 的 db 落点没跟随 TRADINGAGENTS_HOME（沙箱会挡住写入或状态泄漏到 ~）"
+    finally:
+        os.environ.pop("TRADINGAGENTS_HOME", None)

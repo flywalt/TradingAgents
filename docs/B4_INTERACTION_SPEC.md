@@ -365,10 +365,10 @@ H5 在配置了 `KVIEWER_BASE_URL` 时报告页出现正确 `end=分析日` 的�
   面向"本机资源紧张、按需启动"的场景；浏览器页面本身无法启动进程，需要由带命令执行能力的面板调用该脚本。
 - 队列与恢复不依赖 UI：UI 挂掉时任务仍在引擎队列里继续，恢复后页面直接看到结果。
 
-### 16.1 公网部署（`trade.dafeis.com`）
+### 16.1 公网部署（`ta.dafeis.com`）
 
-VPS 上 Caddy 是唯一入口，只反代 UI；UI 与引擎都绑 `127.0.0.1`，引擎仍单实例。部署手册见
-`deploy/README.md`（含 Caddyfile、DNS、令牌、迁移、验证、排障）。
+已由 **vps-deploy 标准**接管（2026-11-16 起）：声明见仓库 `deploy/app.toml`（engine 8802 / ui 8801 双 unit），
+接入标准与运维手册见 VPS 侧 `/home/dafei/projects/vps-deploy-standard.md` 与本仓 `deploy/README.md`。
 
 与局域网形态的三处差异：
 

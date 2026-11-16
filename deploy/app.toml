@@ -18,7 +18,7 @@ api_paths = ["/*"]                    # /、/history、/runs/*、/static/* 都�
 static_root = "dist"                  # 占位：handle /* 在前，此 root 永不命中（见上行注释）
 
 env_required = ["TRADINGAGENTS_WEB_TOKEN", "OPENAI_COMPATIBLE_API_KEY", "TUSHARE_TOKEN"]
-limits = { memory = "600M", cpu = "200%" }
+limits = { memory = "800M", cpu = "200%" }
 
 backup = { paths = ["data/web/state.db", "data/memory", "data/logs"], keep = 7, cron = "0 20 * * *" }
 
