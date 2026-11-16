@@ -8,7 +8,7 @@
 ## 1. 一句话总览
 
 在**不修改上游分析框架**的前提下，新增了一个独立数据层（Tushare）、A 股身份/规则、多市场 Profile、
-运行元数据与同步治理。上游改动仅 5 个文件（其中 3 个经 `upstream-patch:` 提交）；其余大部分为新增文件。
+运行元数据与同步治理。上游改动仅 6 个文件（其中 3 个经 `upstream-patch:` 提交）；其余大部分为新增文件。
 
 ## 2. 模块清单（全部为新增文件）
 
@@ -96,6 +96,7 @@
 | 文件 | 覆盖 |
 | --- | --- |
 | `tests/downstream/test_audit_inventory.py` | 本文件与代码同步 |
+| `tests/downstream/test_go_endpoint_headers.py` | D-0060：Go 端点注入会话头/UA；会话 ID 进程内稳定；非 Go 端点零影响 |
 | `tests/downstream/test_state_home.py` | D-0058：`TRADINGAGENTS_HOME` 开关驱动 default_config 三路径与 web db 兜底；特异目录变量优先 |
 | `tests/downstream/test_bootstrap.py` | 注册门面、签名、幂等、严格隔离 |
 | `tests/downstream/test_registration.py` | 注册与回滚 |
@@ -190,6 +191,7 @@
 | `tests/test_graph_end_to_end.py` | 2 行：期望的数据路径集合跟随路由 | 路由改动的必然连带 | D-0027 |
 | `tradingagents/default_config.py` | 1 行：`_TRADINGAGENTS_HOME = os.getenv("TRADINGAGENTS_HOME") or ~/.tradingagents` | 生产沙箱（vps-deploy）要求运行时状态全量归位到 `/srv/<app>/data`；特异目录变量仍优先 | D-0058 |
 | `README.md` | 末尾 2 行部署注记（docs 提交） | 标注发布已由 vps-deploy 标准接管 | D-0059 |
+| `tradingagents/llm_clients/openai_client.py` | Go 端点注入会话头/UA（helper 独立） | OpenCode Go 订阅端点的接入要求 | D-0060 |
 
 ## 7. 入口
 

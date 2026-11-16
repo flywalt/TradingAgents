@@ -1,6 +1,7 @@
 import logging
 import os
 import re
+import uuid
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
@@ -322,6 +323,25 @@ def _is_native_openai_base_url(base_url: str | None) -> bool:
     return host == "api.openai.com" or host.endswith(".openai.com")
 
 
+def _is_opencode_go_base_url(base_url: str) -> bool:
+    """True for the OpenCode Go subscription endpoint (D-0060)."""
+    if "://" not in base_url:
+        base_url = "https://" + base_url
+    parsed = urlparse(base_url)
+    return parsed.hostname == "opencode.ai" and parsed.path.startswith("/inference/go/")
+
+
+_OPENCODE_SESSION_ID: str | None = None
+
+
+def _opencode_session_id() -> str:
+    """Stable per-process session id (routing + prompt-cache stickiness)."""
+    global _OPENCODE_SESSION_ID
+    if _OPENCODE_SESSION_ID is None:
+        _OPENCODE_SESSION_ID = uuid.uuid4().hex
+    return _OPENCODE_SESSION_ID
+
+
 class OpenAIClient(BaseLLMClient):
     """Client for OpenAI, Ollama, OpenRouter, and xAI providers.
 
@@ -366,6 +386,12 @@ class OpenAIClient(BaseLLMClient):
                 )
             if base_url:
                 llm_kwargs["base_url"] = base_url
+                # OpenCode Go 订阅端点：要求稳定会话头 + 自报家门 UA（缺头 400，见 D-0060）
+                if _is_opencode_go_base_url(base_url):
+                    llm_kwargs["default_headers"] = {
+                        "x-opencode-session": _opencode_session_id(),
+                        "User-Agent": "tradingagents-web/1.0",
+                    }
 
             # API key: required unless key_optional; keyless local servers get a
             # placeholder. The env-var name is the single source in api_key_env.
