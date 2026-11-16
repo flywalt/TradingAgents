@@ -423,3 +423,5 @@ Please reference our work if you find *TradingAgents* provides you with some hel
       url={https://arxiv.org/abs/2412.20138}, 
 }
 ```
+
+> 部署注记：本仓库自 2026-11-16 起由 `vps-deploy` 标准接管发布（`deploy/app.toml`）。
