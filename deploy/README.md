@@ -50,3 +50,21 @@ vps-apps                        # 全机应用清单
 
 新闻源旁路走 RSSHub（`deploy/rsshub/docker-compose.yml` 留作将来参考）。df-tc1 不装 docker，
 `app.toml` 里只登记 `[[external]]` 可达性检查（失败仅警告）。再上时：单独立项，不进本标准。
+
+## 验收记录（2026-11-16，P2 上线）
+
+| 场景 | 实测 | 结果 |
+|---|---|---|
+| 首次部署（含 venv + pip 全量构建） | 08:01 | exit 0，**66.9 s**，双 unit active+enabled，healthz 200×2，RSSHub 按设计仅警告 |
+| 幂等秒退 | 08:02 | **1.7 s** `已是最新` |
+| 真实发布（README 一行） | 08:03 | **18.4 s**（venv 已缓存），marker 更新 |
+| 回滚演练（engine start 坏旗标） | 08:03 | 健康轮询失败 → 回滚重建+重渲染好单元 → **「已回滚到 7c02d69」exit 1，63.6 s**，ui 全程在线 |
+| SSE 三层对照（`/api/runs/<id>/events`，带 Bearer） | 08:05 | engine 直打 / ui 直打 / 经 Caddy 三层均**增量分块到达**——`encode` 不缓冲，无需 `flush_interval` |
+| OOM/`Requires` 连锁演练（SIGKILL engine 主进程） | 08:07 | engine `Restart=always` 秒级自愈，**ui 全程 active**，`/api/engine/health` 恢复 `{"online":true}`——连锁下线担忧实测不存在 |
+| 状态落位硬断言 | 08:02 | `data/{web,logs,memory,cache}` 就位；`/home/ubuntu/.tradingagents` **不存在**（无泄漏） |
+| 备份（`vps-deploy backup`） | 08:07 | `state-*.db`（在线备份）+ `memory-*.tar.gz` + `logs-*.tar.gz` 三件齐，无 `.env` |
+| 首页/静态/链路 | 08:02 | `/` 401 登录页（非 404）、`/static/*` 200、`/api/engine/health` `{"online":true}` |
+
+已知待办：真实分析的内存峰值观察（当前 idle engine ~146M / ui ~116M，上限各 300M）——首次实测因 LLM 后端
+402（OpenCode 额度耗尽）中止，属外部计费问题；充值或换后端后跑一轮补测即可，部署链路不受影响。
+
