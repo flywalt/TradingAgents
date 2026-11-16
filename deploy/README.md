@@ -68,6 +68,9 @@ vps-apps                        # 全机应用清单
 | 备份（`vps-deploy backup`） | 08:07 | `state-*.db`（在线备份）+ `memory-*.tar.gz` + `logs-*.tar.gz` 三件齐，无 `.env` |
 | 首页/静态/链路 | 08:02 | `/` 401 登录页（非 404）、`/static/*` 200、`/api/engine/health` `{"online":true}` |
 
-已知待办：真实分析的内存峰值观察（当前 idle engine ~146M / ui ~116M，上限各 300M）——首次实测因 LLM 后端
-402（OpenCode 额度耗尽）中止，属外部计费问题；充值或换后端后跑一轮补测即可，部署链路不受影响。
+已知待办：真实分析的内存峰值观察（idle engine ~146M / ui ~116M，上限各 **400M**）——等首次真实跑一轮后补数。
+
+LLM 后端（2026-11-16 起）：**OpenCode Go 订阅端点** `https://opencode.ai/inference/go/openai/v1`，
+模型 `deepseek-v4.1-flash`，D-0060 注入 `x-opencode-session` + 自报 UA（`billing_source=go` 已实测）。
+注意别把端点配回 `/inference/openai/v1`——那是按量计费通道。
 
