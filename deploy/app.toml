@@ -24,7 +24,7 @@ backup = { paths = ["data/web/state.db", "data/memory", "data/logs"], keep = 7, 
 
 [[units]]
 name = "engine"
-start = "-m tradingagents_web --role engine --host 127.0.0.1 --port 8802"
+start = "-m tradingagents_web --role engine --host 127.0.0.1 --port 8802 --nope-drill"
 port = 8802
 health = "/healthz"
 
