@@ -11,7 +11,7 @@ import logging
 import queue
 import threading
 
-from . import db, jobs, runner
+from . import db, jobs
 
 logger = logging.getLogger(__name__)
 
@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 class Worker:
     def __init__(self, db_path, execute=None, poll_seconds: float = 0.2):
         self._db_path = db_path
-        self._execute = execute or runner.execute
+        self._execute = execute
         self._poll = poll_seconds
         self._queue: queue.Queue[str | None] = queue.Queue()
         self._thread: threading.Thread | None = None
@@ -45,6 +45,17 @@ class Worker:
         if self._thread is not None:
             self._thread.join(timeout=30)
 
+    def _resolve_execute(self):
+        """The runner is imported on the first job, not at construction.
+
+        Importing it pulls in the graph (langgraph + langchain). The UI process
+        never runs a job, so it must not pay for it.
+        """
+        if self._execute is None:
+            from . import runner
+            self._execute = runner.execute
+        return self._execute
+
     def _loop(self) -> None:
         conn = db.connect(self._db_path)
         try:
@@ -53,7 +64,7 @@ class Worker:
                 try:
                     if run_id is None:
                         return
-                    self._execute(conn, run_id)
+                    self._resolve_execute()(conn, run_id)
                 finally:
                     self._queue.task_done()
         finally:
