@@ -38,7 +38,7 @@ from tradingagents_cn.market import CN_A_SHARE, select_profile
 from tradingagents_cn.symbols import try_normalize
 
 from . import db, jobs, labels, progress_graph, report_page, search, security
-from .errors import QueueFullError, classify
+from .errors import EngineUnreachableError, QueueFullError, classify
 from .worker import Worker
 
 ANALYSTS = ("market", "social", "news", "fundamentals")
@@ -235,9 +235,16 @@ def create_app(
                 return {"online": False}
 
         @app.api_route("/api/{path:path}",
-                       methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
-                       dependencies=[Depends(require_read)])
+                       methods=["GET", "POST", "PUT", "PATCH", "DELETE"])
         async def proxy_api(path: str, request: Request):
+            # Reads may use the read-only token; anything that can mutate -- above
+            # all submitting a run, which spends real model money -- needs the
+            # write token. Authorising the whole route as "read" made the
+            # read-only credential a write credential.
+            if request.method == "GET":
+                require_read(request)
+            else:
+                require_write(request)
             body = await request.body()
             # The client must outlive this handler: the body is streamed after
             # the response object is returned, so both are closed in the
@@ -252,7 +259,7 @@ def create_app(
                 )
             except httpx.HTTPError:
                 await client.aclose()
-                return JSONResponse({"detail": "engine unreachable"}, status_code=502)
+                return _error(EngineUnreachableError())
 
             async def close_both():
                 await upstream.aclose()

@@ -33,11 +33,18 @@ class ReportWriteError(Exception):
     """The report could not be written to disk."""
 
 
+class EngineUnreachableError(Exception):
+    """The UI process cannot reach the engine process at all."""
+
+
 def classify(exc: BaseException) -> ErrorInfo:
     if isinstance(exc, QueueFullError):
         return ErrorInfo("queue_full", "已有任务在运行或排队（上限 3）。", "稍后再试。", 409)
     if isinstance(exc, ReportWriteError):
         return ErrorInfo("report_write", "报告写入失败。", "检查磁盘空间与目录权限。")
+    if isinstance(exc, EngineUnreachableError):
+        return ErrorInfo("engine_unreachable", "分析引擎不可达（UI 与引擎之间连接失败）。",
+                         "稍后重试；持续出现则检查 engine 单元是否在跑。", 502)
     if isinstance(exc, VendorNotConfiguredError):
         return ErrorInfo("vendor_unconfigured", "数据源未配置（缺少凭据）。",
                          "在 .env 中配置对应 token 后重启服务。")
