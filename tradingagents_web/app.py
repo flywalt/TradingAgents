@@ -16,6 +16,7 @@ from urllib.parse import parse_qs
 
 import httpx
 from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import (
     FileResponse,
     HTMLResponse,
@@ -172,6 +173,20 @@ def create_app(
 
         app.add_middleware(CORSMiddleware, allow_origins=origins, allow_methods=["GET"],
                            allow_headers=["Authorization", "X-Token"])
+
+    @app.exception_handler(RequestValidationError)
+    async def _validation_error(_request: Request, exc: RequestValidationError):
+        # FastAPI's default is {"detail": [...]}; the shell only reads
+        # body.error.message, so an unvalidated payload would surface as the
+        # useless "submit failed" with the real reason buried.
+        fields = sorted({".".join(str(part) for part in error["loc"][1:]) or "body"
+                         for error in exc.errors()})
+        return JSONResponse(
+            {"error": {"category": "bad_request",
+                       "message": f"请求参数不合法：{', '.join(fields)}",
+                       "action": "检查必填字段与格式后重试。"}},
+            status_code=422,
+        )
 
     # ---------------------------------------------------------------- auth
     def _provided_token(request: Request) -> str | None:

@@ -411,3 +411,18 @@ def test_the_login_page_posts_rather_than_putting_the_token_in_the_url(client):
     page = client.get("/history", headers={"Accept": "text/html"})
 
     assert '<form method="post" action="/login">' in page.text
+
+
+def test_a_malformed_payload_answers_in_the_error_contract(client):
+    """422 也要走 error 契约：前端只读 body.error.message。
+
+    FastAPI 默认的 `{"detail": [...]}` 会让表单显示"提交失败"，把"缺了 symbol"
+    这种可自解的信息埋掉。
+    """
+    reply = client.post("/api/runs", headers=AUTH, json={})
+
+    assert reply.status_code == 422
+    body = reply.json()
+    assert body["error"]["category"] == "bad_request"
+    assert "symbol" in body["error"]["message"]
+    assert body["error"]["action"]

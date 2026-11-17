@@ -114,6 +114,7 @@
 | D-0064 | 本条 `fix(web)` | fix | UI 代理两端：① `/api/{path}` 授权按方法分流（GET → `require_read`，其余 → `require_write`）——此前整条路由只认 `require_read`，设了只读令牌即等于给了写权限（生产未设故不可利用）；② 引擎不可达改走统一错误契约（新增 `EngineUnreachableError` / `engine_unreachable` / 502），前端 `body.error.message` 才有话可说，不再是 `{"detail": …}` | 无 | 无 | `test_web_roles.py` 新增 2 项（先红后绿） |
 | D-0065 | 本条 `perf(web)` | perf | worker 延迟导入 `runner`：队列里没有任务就不加载分析栈（langgraph + langchain）。实测口径：`import tradingagents_web.worker` 原本连带 runner；但 `app.py` 为身份解析导入 `tradingagents.agents.context` 已拖入 langchain，所以真正的省量是**个位数 M**（实测 145 M → 139 M），不是"几十 M"。收益诚实记录，不为此加深改造 | 无 | 无 | 新增 `tests/downstream/test_web_lazy_stack.py` 3 项（子进程断言导入面 + 默认 execute 仍解析成 runner） |
 | D-0066 | 本条 `docs(deploy)` | docs | 运维口径补齐（无代码）：`deploy/README.md` 记 `env_required` 按 provider 写死（换 minimax 要同步改 `app.toml`）、`/api/engine/health` 定位（运维探针，页面不消费）、`api_paths=["/*"]` 的绕行与风险、令牌表改用已修好的授权分流口径；`app.toml` 的 `env_required` 行加同义注释；`docs/UPSTREAM_DELTA.md` 的 D-0059 行补记 `README.md` 为上游文件改动（此前 EXTENSIONS 记了、台账漏了）；验收记录补**报告数字独立复核**（OHLCV/五项指标/百分比逐位对齐，见 README）与"基本面口径未覆盖"的边界说明 | 无 | 无 | 不涉及代码；复核脚本未入仓（一次性核对，证据写进 README） |
+| D-0067 | 本条 `fix(web)` | fix | 422 也走统一错误契约：FastAPI 默认的 `{"detail": [...]}` 换成 `error.category=bad_request` + 字段清单 + 下一步动作——前端只读 `body.error.message`，否则"缺了 symbol/date"这种可自解的信息会显示成笼统的"提交失败"（部署后实测 POST 非法载荷曾返回 422 默认体） | 无 | 无 | `test_web_api.py` 新增 1 项（先红后绿） |
 
 十余条下游提交合计新增代码与文档，**0 行上游改动**。下游与上游的唯一耦合是文档里登记的"脆弱耦合"，
 现在由 `tests/downstream/test_sync_guard.py`（12 组断言）机械锁定。
