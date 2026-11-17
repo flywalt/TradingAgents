@@ -505,6 +505,14 @@ def create_app(
         return {"id": run_id, "position": jobs.queue_position(session, run_id),
                 "deduplicated": False}
 
+    @app.get("/api/budget", dependencies=[Depends(require_read)])
+    def budget(session=Depends(_conn)):  # noqa: B008
+        """Today's quota, so a caller can ask before spending (kviewer shows it)."""
+        limit = daily_limit()
+        used = jobs.created_since(session, local_day_start_utc())
+        return {"used": used, "limit": limit,
+                "remaining": max(limit - used, 0) if limit else None}
+
     @app.get("/api/search", dependencies=[Depends(require_read)])
     def search_instruments(q: str = ""):
         """Suggestions for the run form: a code or name fragment."""

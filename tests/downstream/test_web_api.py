@@ -526,3 +526,13 @@ def test_force_bypasses_deduplication(client):
 
     assert forced.status_code == 202
     assert forced.json()["id"] != first.json()["id"]
+
+
+def test_the_budget_endpoint_reports_used_and_limit(client, monkeypatch):
+    monkeypatch.setenv("TRADINGAGENTS_DAILY_RUN_LIMIT", "3")
+    client.post("/api/runs", headers=AUTH,
+                json={"symbol": "600519.SH", "date": "2026-11-13", "analysts": ["market"]})
+
+    body = client.get("/api/budget", headers=AUTH).json()
+
+    assert body["limit"] == 3 and body["used"] == 1 and body["remaining"] == 2
