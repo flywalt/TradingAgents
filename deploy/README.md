@@ -78,8 +78,9 @@ vps-apps                        # 全机应用清单
 - ui 单元 `Requires=engine`。实测（SIGKILL engine 主进程）：engine `Restart=always` 秒级自愈、
   **ui 全程 active**——快速自愈下 `Requires` 连锁不会造成停站；OOM 路径未实测，若见 ui 停在
   inactive，跑一次 `vps-deploy tradingagents` 拉起。
-- `limits` 已按终审裁定提到 **800M 总量**（engine/ui 各 400M；idle 实测 146M/116M，旧手册记录过
-  单次真实分析 engine 峰值 ~210M，600M 均分余量过薄）。仍见 `journalctl` 里 `Killed`（OOM）就继续上调。
+- `limits` 按终审裁定为 **800M 总量**（engine/ui 各 400M；idle 实测 146M/116M；2026-11-17 单分析师
+  真实分析实测 engine 峰值 **157.9 M**、ui **122.3 M**，余量约 2.5×）。仍见 `journalctl` 里 `Killed`
+  （OOM）就继续上调。
 - 回滚演练的坏 commit 会短暂经过 `main`——这是拉取式部署的固有形态（工具只从 `origin/main` 取代码），
   bisect 时注意跳过标注 `test(deploy)` 的演练提交。
 
@@ -113,7 +114,8 @@ vps-apps                        # 全机应用清单
 | 备份（`vps-deploy backup`） | 08:07 | `state-*.db`（在线备份）+ `memory-*.tar.gz` + `logs-*.tar.gz` 三件齐，无 `.env` |
 | 首页/静态/链路 | 08:02 | `/` 401 登录页（非 404）、`/static/*` 200、`/api/engine/health` `{"online":true}` |
 
-已知待办：真实分析的内存峰值观察（idle engine ~146M / ui ~116M，上限各 **400M**）——等首次真实跑一轮后补数。
+内存峰值（2026-11-17 实测，见下方补测表）：idle engine ~146M / ui ~116M；单分析师真实分析
+engine 峰值 **157.9 M**、ui **122.3 M**，上限各 **400M**（余量约 2.5×）。
 
 LLM 后端（2026-11-16 起）：**OpenCode Go 订阅端点** `https://opencode.ai/inference/go/openai/v1`，
 模型 `deepseek-v4.1-flash`，D-0060 注入 `x-opencode-session` + 自报 UA（`billing_source=go` 已实测）。
@@ -127,13 +129,13 @@ LLM 后端（2026-11-16 起）：**OpenCode Go 订阅端点** `https://opencode.
 | RSSHub key 轮换后取数 | 11-17 | 403 → **200**，应用内 `rsshub.parse_items(fetch("/xueqiu/hots"))` 返回 **10 条** |
 | 服务令牌边界 | 11-17 | 浏览器令牌直打 engine `/api/runs` → **401 token required**；engine 令牌 → **200**；经 ui 代理登录态 → **200** |
 | 重启后健康 | 11-17 | 两 unit `active`、`NRestarts=0`、`/healthz` 200×2 |
+| **P0 修复：`six` + 冒烟 + 启动自检**（D-0062） | 11-17 11:01 | 重发布 20.7 s；`six 1.17.0` / `tushare 1.4.29` 可导入；`/api/preview` 的 `name` → **贵州茅台**（原 `null`）；`/api/search?q=茅台` → `[{600519.SH, 贵州茅台}]`（原 `[]`）；journal 无 probe 告警（构建成功即安静） |
+| **首次成功的真实分析**（`d5a9146d…`，600519.SH / 2026-11-13 / **单分析师**） | 11-17 03:01:34 → 03:15:50（**14 min 16 s**） | `succeeded`，评级 **Hold**，`complete_report.md` **67 KB**（含 `贵州茅台`、`MA`、`均线`；头部注明 `Data vendors: … tushare,yfinance`）；`/runs/<id>` 200、`/runs/<id>/report` 200（110 KB） |
+| 内存峰值（真实分析全程） | 11-17 03:01–03:16 | engine 运行中稳定 **152–156 M**、峰值 **157.9 M**；ui 峰值 **122.3 M**；上限各 400 M——**余量约 2.5×** |
 
 仍未闭环：
 
-1. **成功跑通一轮真实分析**（上表第一行：历史运行因 402 失败，修复后尚未重跑）——验收记录的核心待办；
-2. **`six` 缺失（P0，运行期）**：VPS 干净 venv 里 `import tushare` 抛 `ModuleNotFoundError: No module named 'six'`
-   （tushare 1.4.29 元数据漏声明），13 处 `get_api()` 全线静默降级：`/api/preview` 的 `name` 为 `null`、
-   `/api/search?q=茅台` 返回 `[]`、journal 无告警。家用机能跑只因 `six` 被别的依赖顺带装了。
-   修法：`requirements-downstream.txt` 补 `six>=1.16` + build 冒烟加 `import tushare` + engine 启动自检告警。
+1. **多分析师全链路**（4 分析师 = 并行分支 + 更多 LLM 调用，耗时与峰值都会更高；单分析师 14 分钟说明真实调度是分钟级，全量建议留一个完整时段观察）；
+2. **报告语义抽检**：本次只验证了"有数据、能出报告、页面能渲染"，尚未人工核对数字口径（复权锚点、单位、PIT）。
 
 
