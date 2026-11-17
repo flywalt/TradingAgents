@@ -5,6 +5,7 @@ default_config 的三处默认路径（results/cache/memory）必须跟随单一
 """
 
 import importlib
+from pathlib import Path
 
 import pytest
 
@@ -16,7 +17,6 @@ def _restore_default_config():
     yield
     import tradingagents.default_config as dc
     importlib.reload(dc)
-from pathlib import Path
 
 
 def test_tradingagents_home_env_overrides_default(monkeypatch, tmp_path):
@@ -74,7 +74,7 @@ def test_create_app_consumes_default_db_path(tmp_path):
     os.environ.pop("TRADINGAGENTS_WEB_DB", None)
     try:
         from tradingagents_web.app import create_app
-        app = create_app(role="ui", dev_no_token=True)
+        create_app(role="ui", dev_no_token=True)
         assert (tmp_path / "web" / "state.db").exists(), \
             "create_app 的 db 落点没跟随 TRADINGAGENTS_HOME（沙箱会挡住写入或状态泄漏到 ~）"
     finally:
