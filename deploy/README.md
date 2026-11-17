@@ -32,13 +32,14 @@
 | --- | --- | --- | --- |
 | `TRADINGAGENTS_WEB_TOKEN` | 浏览器登录口令（写权限），同时是 ui 的兜底服务令牌 | 人 | 已设，`POST /login` 换取 HttpOnly cookie |
 | `TRADINGAGENTS_ENGINE_TOKEN` | ui → engine 的服务令牌；engine 只认这一颗 | ui 进程 | 已设（`secrets.token_urlsafe(32)`，600）。**设了之后 Web 令牌直打 engine 会被 401** |
-| `TRADINGAGENTS_WEB_READ_TOKEN` | 只读凭据：`require_read` 接口（`/api/runs*`、`/api/engine/health`）可用 | 外部只读调用方 | 未设（无消费方；设之前先修代理的方法分流，见下） |
+| `TRADINGAGENTS_WEB_READ_TOKEN` | 只读凭据：`require_read` 接口（GET `/api/*`、`/api/engine/health`）可用；**写操作只认 Web 令牌** | 外部只读调用方 | 未设（无消费方；代理已按方法分流，设上即可用） |
 
 - 令牌未设时的回退：`engine` 角色在 `TRADINGAGENTS_ENGINE_TOKEN` 为空时退用 `TRADINGAGENTS_WEB_TOKEN`
   （单机可用，但服务边界消失）；ui 转发同理。
-- **已知缺陷（待修）**：`/api/{path}` 代理对所有方法都用 `require_read`，只读令牌目前能 POST 提交任务。
-  生产未设只读令牌，故当前不可利用；上只读令牌前必须先按方法分流（GET → `require_read`，其余 →
-  `require_write`）。
+- 授权分流（D-0064）：`/api/{path}` 代理 GET 走 `require_read`、其余方法走 `require_write`；
+  引擎不可达返回 502 且带统一错误体（`error.category=engine_unreachable`）。
+- `env_required` 是**按当前 provider 写死的**（生产用 openai-compatible）。换 provider（如 minimax）时
+  必须同步改 `app.toml` 的 `env_required`，否则 preflight 会拦一个用不到的键、而放行真正缺的那个。
 
 ## 日常操作（VPS 上）
 
@@ -81,6 +82,10 @@ vps-apps                        # 全机应用清单
 - `limits` 按终审裁定为 **800M 总量**（engine/ui 各 400M；idle 实测 146M/116M；2026-11-17 单分析师
   真实分析实测 engine 峰值 **157.9 M**、ui **122.3 M**，余量约 2.5×）。仍见 `journalctl` 里 `Killed`
   （OOM）就继续上调。
+- `/api/engine/health` 只给运维看（人工 curl / 将来的监控），页面不消费它；它走 `require_read`，
+  不带令牌不会暴露引擎细节。
+- `api_paths=["/*"]` 与占位 `static_root` 是为绕开工具"静态站点默认假设"的写法：本站所有路径都由
+  ui 渲染，必须 catch-all 反代。若将来 vps-deploy 校验 `api_paths` 前缀，这里会第一个失败（已注释）。
 - 回滚演练的坏 commit 会短暂经过 `main`——这是拉取式部署的固有形态（工具只从 `origin/main` 取代码），
   bisect 时注意跳过标注 `test(deploy)` 的演练提交。
 
@@ -132,10 +137,12 @@ LLM 后端（2026-11-16 起）：**OpenCode Go 订阅端点** `https://opencode.
 | **P0 修复：`six` + 冒烟 + 启动自检**（D-0062） | 11-17 11:01 | 重发布 20.7 s；`six 1.17.0` / `tushare 1.4.29` 可导入；`/api/preview` 的 `name` → **贵州茅台**（原 `null`）；`/api/search?q=茅台` → `[{600519.SH, 贵州茅台}]`（原 `[]`）；journal 无 probe 告警（构建成功即安静） |
 | **首次成功的真实分析**（`d5a9146d…`，600519.SH / 2026-11-13 / **单分析师**） | 11-17 03:01:34 → 03:15:50（**14 min 16 s**） | `succeeded`，评级 **Hold**，`complete_report.md` **67 KB**（含 `贵州茅台`、`MA`、`均线`；头部注明 `Data vendors: … tushare,yfinance`）；`/runs/<id>` 200、`/runs/<id>/report` 200（110 KB） |
 | 内存峰值（真实分析全程） | 11-17 03:01–03:16 | engine 运行中稳定 **152–156 M**、峰值 **157.9 M**；ui 峰值 **122.3 M**；上限各 400 M——**余量约 2.5×** |
+| **报告行情数字独立复核**（不跑应用里的指标实现，直接用 `fetch_bars` + pandas 重算） | 11-17 | 原始日线 open/high/low/close/vol/amount/pct **逐位相同**（1404.00 / 1437.69 / 1394.00 / 1435.26 / 4,177,984 股 / 59.55 亿 / +1.77%）；SMA50 **1323.59**、SMA200 **1327.89**、EMA10 **1420.49**、BOLL 中轨 **1390.25**（上轨 1502.00 与 `ddof=1` 一致）、ATR14 32.84、VWMA **1421.35**（应用口径是 14 日，与报告一致）；"中轨自 10-13 +9.87%" 复算 **+9.87%**；单位与整手换算（143,526 元/手）自洽 |
+| 代理授权分流 + 502 契约（D-0064） | 11-17 11:2x | 部署后 GET/POST 带登录态均正常（GET `/api/runs` 200、POST 非法载荷返回引擎的 400 统一错误体）；只读令牌相关行为由单测锁定 |
 
 仍未闭环：
 
-1. **多分析师全链路**（4 分析师 = 并行分支 + 更多 LLM 调用，耗时与峰值都会更高；单分析师 14 分钟说明真实调度是分钟级，全量建议留一个完整时段观察）；
-2. **报告语义抽检**：本次只验证了"有数据、能出报告、页面能渲染"，尚未人工核对数字口径（复权锚点、单位、PIT）。
+1. **多分析师全链路**（4 分析师 = 并行分支 + 更多 LLM 调用，耗时与峰值都会更高；单分析师 14 分钟说明真实调度是分钟级）。**由人手动触发**，不排自动任务；
+2. **基本面口径未跑过**：本次是单分析师（market）运行，报告的 PIT/财报单位/公告日过滤没有被执行到——抽查只覆盖行情与指标；要验这部分必须跑 `fundamentals`（同样由人手动触发）。
 
 
