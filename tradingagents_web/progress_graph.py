@@ -57,70 +57,33 @@ _WIDE = {
     # Horizontal: the stages hand over left to right, each stage's boxes stack
     # vertically (the risk trio keeps its triangle). One screen, one line of
     # travel, and one measure between stages so the hand-offs read as equals.
+    #
+    # Only the constants that the flow is built from live here; the coordinates
+    # themselves are derived in ``_wide_spec`` (one gutter, one stage gap), so
+    # there is no second copy of the layout to drift.
     "viewBox": "0 0 1310 430",
     "orient": "h",
     #: A 13px label in a 40px card: 13.5px of air above and below. 48 left the
     #: cards looking like empty chips next to the rest of the page's rhythm.
     "height": 40,
-    "analyst_x": 20,
     "analyst_width": 130,
     "analyst_gap": 16,
     "spine_y": 215.0,
     "stage_gap": 48,
-    "boxes": {
-        "memory": (1158, 304, 140),
-        "bull": (226, 156, 150),
-        "bear": (226, 234, 150),
-        "research-manager": (438, 195, 140),
-        "trader": (626, 195, 140),
-        "risk-aggressive": (828, 124, 120),
-        "risk-conservative": (828, 266, 120),
-        "risk-neutral": (978, 195, 120),
-        "portfolio": (1158, 195, 140),
-    },
-    # Every group carries the same frame: 26 above the label band, 26 below
-    # the last card - and each stage sits the same 48 from its neighbours.
-    "groups": [
-        {"id": "input", "label": "输入", "members": "analysts",
-         "x": 6, "y": 85, "w": 158, "h": 260},
-        {"id": "research", "label": "研究辩论", "members": ["bull", "bear"],
-         "x": 212, "y": 130, "w": 178, "h": 170},
-        {"id": "risk", "label": "风险辩论 · 循环", "members":
-            ["risk-aggressive", "risk-conservative", "risk-neutral"],
-         "x": 814, "y": 98, "w": 296, "h": 234},
-    ],
 }
 
 _NARROW = {
+    # Narrow: one vertical spine. The whole flow is computed in ``_narrow_spec``
+    # from the card count, so a one-analyst run draws a short page instead of a
+    # four-analyst column with three empty rows.
     "viewBox": "0 0 360 910",
     "height": 40,
-    "analyst_y": 50,
     "analyst_width": 240,
     "analyst_x": 60,
     "analyst_gap": 16,
-    "default_width": 240,
     "stage_gap": 24,
     "margin_x": 8.0,
-    "boxes": {
-        "memory": (60, 850),
-        "bull": (20, 334, 150),
-        "bear": (190, 334, 150),
-        "research-manager": (60, 424),
-        "trader": (60, 488),
-        "risk-aggressive": (45, 578, 100),
-        "risk-conservative": (215, 578, 100),
-        "risk-neutral": (130, 658, 100),
-        "portfolio": (60, 748),
-    },
-    "groups": [
-        {"id": "input", "label": "输入", "members": "analysts",
-         "x": 48, "y": 24, "w": 264, "h": 260},
-        {"id": "research", "label": "研究辩论", "members": ["bull", "bear"],
-         "x": 6, "y": 308, "w": 348, "h": 92},
-        {"id": "risk", "label": "风险辩论 · 循环", "members":
-            ["risk-aggressive", "risk-conservative", "risk-neutral"],
-         "x": 8, "y": 552, "w": 344, "h": 172},
-    ],
+    "default_width": 240,
 }
 
 
@@ -328,7 +291,12 @@ def _edges_vertical(nodes: dict[str, dict], spec: dict, groups: dict) -> list[di
 
 
 def _groups(spec: dict, nodes: dict[str, dict]) -> list[dict]:
-    """The declared group rects with their member ids resolved."""
+    """The declared group rects with their member ids resolved.
+
+    The vertical extent is then taken from the cards themselves: a frame is
+    always a 26px band, its cards, and a 26px foot. That is what stops a
+    one-analyst run from being drawn inside a four-analyst box.
+    """
     groups = []
     for group in spec["groups"]:
         entry = dict(group)
@@ -338,15 +306,156 @@ def _groups(spec: dict, nodes: dict[str, dict]) -> list[dict]:
                                 if node_id.startswith("analyst-")]
         else:
             entry["members"] = list(members)
+        cards = [nodes[node_id] for node_id in entry["members"] if node_id in nodes]
+        if cards:
+            top = min(card["y"] for card in cards)
+            bottom = max(card["y"] + card["h"] for card in cards)
+            entry["y"] = top - _BAND
+            entry["h"] = bottom - top + _BAND + _FOOT
         groups.append(entry)
     return groups
 
 
+#: Frame geometry, in one place: a group carries a 26px label band above its
+#: cards and 26px of foot below them, whatever the cards are.
+_BAND = 26
+_FOOT = 26
+#: Narrow flow: 24 between stages, 80 between the risk triangle's two rows, and
+#: a wider gap before the memory log (the feedback line runs through it).
+_STAGE_GAP = 24
+_RISK_STAGGER = 80
+_MEMORY_GAP = 62
+_CANVAS_PAD = 20
+_TOP_MARGIN = 24
+
+
+def _column_height(spec: dict, count: int) -> int:
+    """How tall a stack of analyst cards is (one card's worth when none)."""
+    count = max(count, 1)
+    return count * spec["height"] + (count - 1) * spec["analyst_gap"]
+
+
+def _wide_spec(spec: dict, count: int) -> dict:
+    """Wide: the input frame follows the selection; the stage flow is fixed.
+
+    The x axis is derived rather than typed in: one 14px gutter inside every
+    frame, 48 between stages. Same flow as the hand-tuned coordinates, without
+    the two-pixel drift they had (the risk frame was a hair narrower than its
+    cards).
+    """
+    placed = dict(spec)
+    column = _column_height(spec, count)
+    top = round(spec["spine_y"] - column / 2)
+
+    edge, gap, tri = 14, 48, 150
+    analyst_w = spec["analyst_width"]
+
+    input_x = 6
+    analyst_x = input_x + edge
+    input_w = analyst_w + 2 * edge
+    research_x = input_x + input_w + gap
+    debate_w = 150
+    research_w = debate_w + 2 * edge
+    manager_x = research_x + research_w + gap
+    manager_w = 140
+    trader_x = manager_x + manager_w + gap
+    trader_w = 140
+    risk_x = trader_x + trader_w + gap
+    risk_card_w = 120
+    risk_w = risk_card_w + tri + 2 * edge
+    portfolio_x = risk_x + risk_w + gap
+    portfolio_w = 140
+    risk_card_x = risk_x + edge
+
+    placed["analyst_x"] = analyst_x      # single source: the input frame's gutter
+    placed["boxes"] = {
+        "memory": (portfolio_x, 304, portfolio_w),
+        "bull": (research_x + edge, 156, debate_w),
+        "bear": (research_x + edge, 234, debate_w),
+        "research-manager": (manager_x, 195, manager_w),
+        "trader": (trader_x, 195, trader_w),
+        "risk-aggressive": (risk_card_x, 124, risk_card_w),
+        "risk-conservative": (risk_card_x, 266, risk_card_w),
+        "risk-neutral": (risk_card_x + tri, 195, risk_card_w),
+        "portfolio": (portfolio_x, 195, portfolio_w),
+    }
+    placed["groups"] = [
+        {"id": "input", "label": "输入", "members": "analysts",
+         "x": input_x, "y": top - _BAND, "w": input_w,
+         "h": column + _BAND + _FOOT},
+        # y/h are placeholders: _groups() takes them from the cards.
+        {"id": "research", "label": "研究辩论", "members": ["bull", "bear"],
+         "x": research_x, "w": research_w},
+        {"id": "risk", "label": "风险辩论 · 循环", "members":
+            ["risk-aggressive", "risk-conservative", "risk-neutral"],
+         "x": risk_x, "w": risk_w},
+    ]
+    return placed
+
+
+def _narrow_spec(spec: dict, count: int) -> dict:
+    """Narrow: one column, so the whole page reflows with the selection.
+
+    Four analysts reproduce the hand-tuned coordinates exactly (input 24..284,
+    research 308..400, manager 424, trader 488, risk 552..724, portfolio 748,
+    memory 850, canvas 910); fewer analysts simply shorten the page instead of
+    leaving an empty input frame behind.
+    """
+    placed = dict(spec)
+    column = _column_height(spec, count)
+    card = spec["height"]
+
+    analyst_y = _TOP_MARGIN + _BAND
+    input_y = _TOP_MARGIN
+    input_h = column + _BAND + _FOOT
+    research_y = input_y + input_h + _STAGE_GAP
+    research_h = card + _BAND + _FOOT
+    manager_y = research_y + research_h + _STAGE_GAP
+    trader_y = manager_y + card + _STAGE_GAP
+    risk_y = trader_y + card + _STAGE_GAP
+    risk_h = _RISK_STAGGER + card + _BAND + _FOOT
+    portfolio_y = risk_y + risk_h + _STAGE_GAP
+    memory_y = portfolio_y + card + _MEMORY_GAP
+    canvas = memory_y + card + _CANVAS_PAD
+
+    placed["analyst_y"] = analyst_y
+    placed["viewBox"] = f"0 0 360 {canvas}"
+    placed["boxes"] = {
+        "memory": (60, memory_y),
+        "bull": (20, research_y + _BAND, 150),
+        "bear": (190, research_y + _BAND, 150),
+        "research-manager": (60, manager_y),
+        "trader": (60, trader_y),
+        "risk-aggressive": (45, risk_y + _BAND, 100),
+        "risk-conservative": (215, risk_y + _BAND, 100),
+        "risk-neutral": (130, risk_y + _BAND + _RISK_STAGGER, 100),
+        "portfolio": (60, portfolio_y),
+    }
+    placed["groups"] = [
+        {"id": "input", "label": "输入", "members": "analysts",
+         "x": 46, "y": input_y, "w": 268, "h": input_h},
+        {"id": "research", "label": "研究辩论", "members": ["bull", "bear"],
+         "x": 6, "y": research_y, "w": 348, "h": research_h},
+        {"id": "risk", "label": "风险辩论 · 循环", "members":
+            ["risk-aggressive", "risk-conservative", "risk-neutral"],
+         "x": 31, "y": risk_y, "w": 298, "h": risk_h},
+    ]
+    return placed
+
+
+def _placed_spec(spec: dict, analysts: list[str]) -> dict:
+    """The declared layout, resolved for how many analysts this run selected."""
+    if spec.get("orient") == "h":
+        return _wide_spec(spec, len(analysts))
+    return _narrow_spec(spec, len(analysts))
+
+
 def _layout(spec: dict, analysts: list[str]) -> dict:
-    nodes = _build_nodes(spec, analysts)
+    placed = _placed_spec(spec, analysts)
+    nodes = _build_nodes(placed, analysts)
     by_id = {node["id"]: node for node in nodes}
-    return {"viewBox": spec["viewBox"], "nodes": nodes,
-            "edges": _edges(by_id, spec), "groups": _groups(spec, by_id)}
+    return {"viewBox": placed["viewBox"], "nodes": nodes,
+            "edges": _edges(by_id, placed), "groups": _groups(placed, by_id)}
 
 
 def topology(analysts: list[str] | None) -> dict:

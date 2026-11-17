@@ -127,7 +127,7 @@
 | `tests/downstream/test_web_search.py` | 模糊检索：代码/名称/排序/上限/数据源故障降级 |
 | `tests/downstream/test_report_lint.py` | 报告体检：英文标签/盘中描述/无来源数字/空源误标/口径缺失 |
 | `tests/downstream/test_web_report_page.py` | 报告本地化 + 上游标记守卫；剥第三方品牌（logo/credit）；同标签页返回入口与 print 规则 |
-| `tests/downstream/test_web_progress_graph.py` | 拓扑/两套布局/边语义/未选分析师不画/卡高与 26px 框距、24/48 交接节奏 |
+| `tests/downstream/test_web_progress_graph.py` | 拓扑/两套布局/边语义/未选分析师不画/卡高与 26px 框距、14px 侧距、24/48 交接节奏；框随分析师数量收缩、窄屏页高线性变化 |
 | `tests/downstream/test_checkpoint_behavior.py` | 版本/口径/脏工作区使 checkpoint 失效 |
 | `tests/downstream/test_run_metadata.py` | 11 项元数据三处渲染 |
 | `tests/downstream/test_snapshot_routing.py` | 快照路由、契约不变、同源一致 |

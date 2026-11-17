@@ -256,3 +256,65 @@ def test_a_groups_cards_are_centred_in_their_frame(width):
         rights = max(b["x"] + b["w"] for b in members)
         assert abs((lefts + rights) / 2 - (group["x"] + group["w"] / 2)) <= 1, \
             (width, group["id"])
+
+
+@pytest.mark.parametrize("width", ["wide", "narrow"])
+@pytest.mark.parametrize("selected", [["market"], ["market", "news"], ALL])
+def test_the_input_frame_follows_the_selected_analysts(width, selected):
+    """一个分析师的运行不该画一个四人的框：空着的那三格全是空气。
+
+    框的内边距是恒定的（上带/下脚各 26），所以框高必须等于卡片实际占用的
+    高度加 52——选了几个分析师就画几个。
+    """
+    layout = progress_graph.topology(selected)[width]
+    boxes = _boxes(layout)
+    input_group = next(g for g in layout["groups"] if g["id"] == "input")
+    cards = [boxes[i] for i in input_group["members"]]
+
+    tops = min(c["y"] for c in cards)
+    bottoms = max(c["y"] + c["h"] for c in cards)
+    assert tops - input_group["y"] == 26
+    assert input_group["y"] + input_group["h"] - bottoms == 26
+    assert input_group["h"] == bottoms - tops + 52
+
+
+@pytest.mark.parametrize("width", ["wide", "narrow"])
+@pytest.mark.parametrize("selected", [["market"], ["market", "news"], ALL])
+def test_every_frame_hugs_its_cards_whatever_is_selected(width, selected):
+    """选了几个分析师，所有框都还是同一套 26px 上带/下脚。"""
+    layout = progress_graph.topology(selected)[width]
+    boxes = _boxes(layout)
+
+    for group in layout["groups"]:
+        cards = [boxes[i] for i in group["members"]]
+        assert min(c["y"] for c in cards) - group["y"] == 26, (width, selected, group["id"])
+        assert group["y"] + group["h"] - max(c["y"] + c["h"] for c in cards) == 26, \
+            (width, selected, group["id"])
+
+
+def test_a_narrower_selection_draws_a_shorter_page():
+    """窄屏是纵向排布：少几个分析师，整张图就该短一截，而不是多留白。"""
+    pairs = [("market",), ("market", "news"), ("market", "news", "social"),
+             ("market", "social", "news", "fundamentals")]
+    heights = [int(progress_graph.topology(list(p))["narrow"]["viewBox"].split()[3])
+               for p in pairs]
+
+    assert heights == sorted(heights) and len(set(heights)) == len(heights)
+    # 每多一个分析师，正好多一张卡加一个卡距
+    steps = [b - a for a, b in zip(heights, heights[1:], strict=False)]
+    assert steps == [40 + 16] * 3, steps
+
+
+@pytest.mark.parametrize("width", ["wide", "narrow"])
+@pytest.mark.parametrize("selected", [["market"], ALL])
+def test_every_frame_keeps_the_same_side_gutter(width, selected):
+    """左右内边距也是一套：侧边距 14px，和上下 26px 一样不该有的多有的少。"""
+    layout = progress_graph.topology(selected)[width]
+    boxes = _boxes(layout)
+
+    for group in layout["groups"]:
+        cards = [boxes[i] for i in group["members"]]
+        lefts = min(c["x"] for c in cards)
+        rights = max(c["x"] + c["w"] for c in cards)
+        assert lefts - group["x"] == 14, (width, selected, group["id"])
+        assert group["x"] + group["w"] - rights == 14, (width, selected, group["id"])
