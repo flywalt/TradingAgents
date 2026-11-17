@@ -16,7 +16,7 @@ SAMPLE = """<!doctype html>
 <html lang="en">
 <head><title>600519.SH 2026-11-02 Hold: TradingAgents report</title></head>
 <body>
-<header><h1><span class="ticker">600519.SH</span> <span class="rating level">Hold</span></h1>
+<header class="masthead"><a class="logo" href="https://tauric.ai" rel="noopener" aria-label="Tauric Research"><svg viewBox="0 0 10 10"><path d="M0 0h10v10H0z"/></svg></a><h1><span class="ticker">600519.SH</span> <span class="rating level">Hold</span></h1>
 <p class="date">Analysis of 2026-11-02</p>
 <dl class="run"><div><dt>Generated</dt><dd>2026-11-02 13:22</dd></div>
 <div><dt>Debate rounds</dt><dd>1</dd></div></dl></header>
@@ -32,6 +32,7 @@ SAMPLE = """<!doctype html>
 <p>组合在本周没有需要立即执行的调整；风险预算保持不变。</p>
 <p>第三段不应出现在摘要里。</p></section>
 <section id="s6"><h2>Downstream run metadata</h2></section></main>
+<footer class="credit"><a href="https://github.com/TauricResearch" rel="noopener">TradingAgents</a> powered by <a class="brand" href="https://tauric.ai" rel="noopener">Tauric Research</a></footer>
 <a class="to-top" href="#top">Top</a>
 </body>
 </html>"""
@@ -65,9 +66,19 @@ def test_the_report_body_is_never_touched():
     assert '<h3 id="s1-1">（一）市场分析师</h3>' in out   # agents: （一）
 
 
-def test_an_english_run_is_returned_unchanged():
-    assert report_page.present(SAMPLE, "English") == SAMPLE
-    assert report_page.present(SAMPLE, None) == SAMPLE
+def test_an_english_run_keeps_its_own_words():
+    """英文报告不再逐字等于输入：外壳（去品牌 + 样式）是我们加的，正文不动。
+
+    这条以前断言"返回同一份 HTML"，品牌剥离与外壳样式注入之后那个契约变了，
+    所以改成钉住真正要保的东西：英文标签一个都不翻。
+    """
+    for language in ("English", None):
+        out = report_page.present(SAMPLE, language)
+        assert '<html lang="en">' in out
+        assert '<p class="date">Analysis of 2026-11-02</p>' in out
+        assert "<dt>Generated</dt>" in out
+        assert "分析日期" not in out and "生成时间" not in out
+        assert "正文中的 Generated、Analysts 这些词不该被翻译。" in out
 
 
 def test_a_report_without_a_rating_is_left_alone():
@@ -115,6 +126,13 @@ def test_the_markup_we_match_is_still_produced_upstream():
     html = _upstream_report()
     for marker in report_page.UPSTREAM_MARKERS:
         assert marker in html, marker
+    # The branding strip is a regex over upstream markup: same fuse. If upstream
+    # renames the logo or the credit footer, this fails here instead of the page
+    # quietly showing "powered by Tauric Research" again.
+    assert 'class="logo"' in html and "Tauric Research" in html
+    stripped = report_page.strip_branding(html)
+    assert "Tauric" not in stripped and 'class="logo"' not in stripped
+    assert "<main>" in stripped and "</html>" in stripped
 
 
 def test_a_chinese_report_gets_cjk_typography():
@@ -319,3 +337,39 @@ def test_the_metadata_section_we_no_longer_write_is_dropped():
     # the fixture's own sixth heading is a different thing; in Chinese it is the
     # translated chapter and stays
     assert "下游运行元数据" in report_page.present(html, "中文")
+
+
+def test_the_page_carries_no_third_party_branding():
+    """读者的报告页不该出现上游的 logo 与 "powered by" 页脚。
+
+    产物文件（内核写的 complete_report.html）保持原样；这一层只改交给浏览器的
+    那一份，所以品牌是在"出站"时剥掉的。
+    """
+    for language in ("中文", "English"):
+        out = report_page.present(SAMPLE, language)
+        assert "tauric.ai" not in out
+        assert "Tauric Research" not in out
+        assert 'class="logo"' not in out
+        assert "powered by" not in out
+
+
+def test_the_page_offers_a_way_back_to_the_run():
+    """报告在同一个标签页打开，就必须有一条明确的返回路径。"""
+    out = report_page.present(SAMPLE, "中文", back_href="/runs/abc123")
+
+    assert 'href="/runs/abc123"' in out
+    assert "返回分析" in out
+    assert 'class="ta-back"' in out
+
+
+def test_an_english_run_gets_an_english_way_back():
+    out = report_page.present(SAMPLE, "English", back_href="/runs/abc123")
+
+    assert "Back to run" in out
+    assert "返回分析" not in out
+
+
+def test_without_a_run_id_no_back_link_is_invented():
+    out = report_page.present(SAMPLE, "中文")
+
+    assert 'class="ta-back"' not in out

@@ -59,39 +59,41 @@ _WIDE = {
     # travel, and one measure between stages so the hand-offs read as equals.
     "viewBox": "0 0 1310 430",
     "orient": "h",
-    "height": 48,
+    #: A 13px label in a 40px card: 13.5px of air above and below. 48 left the
+    #: cards looking like empty chips next to the rest of the page's rhythm.
+    "height": 40,
     "analyst_x": 20,
     "analyst_width": 130,
     "analyst_gap": 16,
     "spine_y": 215.0,
     "stage_gap": 48,
     "boxes": {
-        "memory": (1158, 300, 140),
-        "bull": (226, 152, 150),
-        "bear": (226, 230, 150),
-        "research-manager": (438, 191, 140),
-        "trader": (626, 191, 140),
-        "risk-aggressive": (828, 120, 120),
-        "risk-conservative": (828, 262, 120),
-        "risk-neutral": (978, 191, 120),
-        "portfolio": (1158, 191, 140),
+        "memory": (1158, 304, 140),
+        "bull": (226, 156, 150),
+        "bear": (226, 234, 150),
+        "research-manager": (438, 195, 140),
+        "trader": (626, 195, 140),
+        "risk-aggressive": (828, 124, 120),
+        "risk-conservative": (828, 266, 120),
+        "risk-neutral": (978, 195, 120),
+        "portfolio": (1158, 195, 140),
     },
     # Every group carries the same frame: 26 above the label band, 26 below
     # the last card - and each stage sits the same 48 from its neighbours.
     "groups": [
         {"id": "input", "label": "输入", "members": "analysts",
-         "x": 6, "y": 69, "w": 158, "h": 292},
+         "x": 6, "y": 85, "w": 158, "h": 260},
         {"id": "research", "label": "研究辩论", "members": ["bull", "bear"],
-         "x": 212, "y": 126, "w": 178, "h": 178},
+         "x": 212, "y": 130, "w": 178, "h": 170},
         {"id": "risk", "label": "风险辩论 · 循环", "members":
             ["risk-aggressive", "risk-conservative", "risk-neutral"],
-         "x": 814, "y": 94, "w": 296, "h": 242},
+         "x": 814, "y": 98, "w": 296, "h": 234},
     ],
 }
 
 _NARROW = {
     "viewBox": "0 0 360 910",
-    "height": 44,
+    "height": 40,
     "analyst_y": 50,
     "analyst_width": 240,
     "analyst_x": 60,
@@ -100,24 +102,24 @@ _NARROW = {
     "stage_gap": 24,
     "margin_x": 8.0,
     "boxes": {
-        "memory": (60, 848),
-        "bull": (20, 350, 150),
-        "bear": (190, 350, 150),
-        "research-manager": (60, 444),
-        "trader": (60, 512),
-        "risk-aggressive": (45, 606, 100),
-        "risk-conservative": (215, 606, 100),
-        "risk-neutral": (130, 686, 100),
-        "portfolio": (60, 780),
+        "memory": (60, 850),
+        "bull": (20, 334, 150),
+        "bear": (190, 334, 150),
+        "research-manager": (60, 424),
+        "trader": (60, 488),
+        "risk-aggressive": (45, 578, 100),
+        "risk-conservative": (215, 578, 100),
+        "risk-neutral": (130, 658, 100),
+        "portfolio": (60, 748),
     },
     "groups": [
         {"id": "input", "label": "输入", "members": "analysts",
-         "x": 48, "y": 24, "w": 264, "h": 276},
+         "x": 48, "y": 24, "w": 264, "h": 260},
         {"id": "research", "label": "研究辩论", "members": ["bull", "bear"],
-         "x": 6, "y": 324, "w": 348, "h": 96},
+         "x": 6, "y": 308, "w": 348, "h": 92},
         {"id": "risk", "label": "风险辩论 · 循环", "members":
             ["risk-aggressive", "risk-conservative", "risk-neutral"],
-         "x": 8, "y": 580, "w": 344, "h": 176},
+         "x": 8, "y": 552, "w": 344, "h": 172},
     ],
 }
 

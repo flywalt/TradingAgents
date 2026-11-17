@@ -426,3 +426,57 @@ def test_a_malformed_payload_answers_in_the_error_contract(client):
     assert body["error"]["category"] == "bad_request"
     assert "symbol" in body["error"]["message"]
     assert body["error"]["action"]
+
+
+def _finished_run(tmp_path, report_dir):
+    conn = db.connect(tmp_path / "state.db")
+    try:
+        run_id = jobs.create(conn, symbol="600519.SH", market="CN", profile="CN_A_SHARE",
+                             trade_date="2026-10-30", analysts=["market"], language="中文",
+                             strict=False, portfolio_json=None)
+        jobs.finish(conn, run_id, rating="Hold", run_dir=str(tmp_path),
+                    report_path=str(report_dir / "complete_report.md"))
+    finally:
+        conn.close()
+    return run_id
+
+
+BRANDED_HTML = """<!doctype html><html lang="en"><head><title>600519.SH: TradingAgents report</title></head>
+<body><header class="masthead"><a class="logo" href="https://tauric.ai" rel="noopener"
+aria-label="Tauric Research"><svg></svg></a><h1><span class="ticker">600519.SH</span></h1>
+<p class="date">Analysis of 2026-10-30</p></header>
+<main><section><h2>I. Analyst Team Reports</h2><p>body</p></section></main>
+<footer class="credit"><a href="https://github.com/TauricResearch">TradingAgents</a> powered by
+<a class="brand" href="https://tauric.ai">Tauric Research</a></footer></body></html>"""
+
+
+def test_the_report_page_offers_a_way_back_and_the_csp_allows_a_click(client, tmp_path):
+    """报告在同标签页打开；返回链接要真的能跳（sandbox 默认会拦顶层导航）。"""
+    report_dir = tmp_path / "report"
+    report_dir.mkdir()
+    (report_dir / "complete_report.md").write_text("# md", encoding="utf-8")
+    (report_dir / "complete_report.html").write_text(BRANDED_HTML, encoding="utf-8")
+    run_id = _finished_run(tmp_path, report_dir)
+
+    response = client.get(f"/runs/{run_id}/report", headers=AUTH)
+
+    assert response.status_code == 200
+    csp = response.headers["content-security-policy"]
+    assert "allow-top-navigation-by-user-activation" in csp
+    assert f'href="/runs/{run_id}"' in response.text
+    assert "返回分析" in response.text
+
+
+def test_the_downloadable_html_artifact_is_also_served_without_branding(client, tmp_path):
+    """`/files/complete_report.html` 是另一条出口，别在那里把 logo 漏回去。"""
+    report_dir = tmp_path / "report"
+    report_dir.mkdir()
+    (report_dir / "complete_report.md").write_text("# md", encoding="utf-8")
+    (report_dir / "complete_report.html").write_text(BRANDED_HTML, encoding="utf-8")
+    run_id = _finished_run(tmp_path, report_dir)
+
+    response = client.get(f"/runs/{run_id}/files/complete_report.html", headers=AUTH)
+
+    assert response.status_code == 200
+    assert "Tauric" not in response.text
+    assert 'class="logo"' not in response.text

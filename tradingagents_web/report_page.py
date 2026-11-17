@@ -335,6 +335,61 @@ def _summary_card(html: str) -> str:
 
 _TICKER_SPAN = re.compile(r'<span class="ticker">([^<]+)</span>')
 
+#: Upstream's own branding, on both ends of the page. The kernel's artifact keeps
+#: it (that file is not ours to rewrite); the copy a reader is handed does not.
+_LOGO_ANCHOR = re.compile(r'<a class="logo".*?</a>\s*', re.S)
+_CREDIT_FOOTER = re.compile(r'<footer class="credit">.*?</footer>\s*', re.S)
+
+_SHELL_STYLE = """<style id="ta-shell">
+/* Our shell, not the artifact: strip the third-party chrome, tighten the
+   page's vertical rhythm, and give a same-tab reader a way back. */
+.page { padding: 2.5rem 1.5rem 3.5rem; }
+.masthead { padding-bottom: 1.4rem; }
+main h2 { margin-top: 3rem; padding-top: 1rem; }
+.ta-summary { margin-top: 1.4rem; padding: 0.9rem 1.1rem; }
+.ta-summary p { margin-bottom: 0.5rem; }
+@media (min-width: 60rem) {
+  .page { padding-top: 3rem; padding-bottom: 4.5rem; }
+}
+/* A thin utility strip, in the sans voice: it belongs to the shell, not the
+   report. Sticky because a report is tens of screens long. */
+.ta-back { position: sticky; top: 0; z-index: 5; display: flex; align-items: baseline;
+  gap: 0.6rem; padding: 0.55rem 1.5rem; font: 500 0.8rem/1.4 var(--sans);
+  background: color-mix(in oklab, var(--paper) 94%, transparent);
+  -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--rule); }
+.ta-back a { color: var(--ink); text-decoration: none; }
+.ta-back a:hover { text-decoration: underline; }
+.ta-back a:focus-visible { text-decoration: underline; outline: 2px solid var(--accent);
+  outline-offset: 3px; border-radius: 2px; }
+.ta-back__meta { color: var(--muted); font-weight: 400; }
+@media (min-width: 60rem) {
+  .ta-back { padding-left: max(1.5rem, calc((100% - 49rem) / 2)); }
+}
+/* A report is also a document: drop the shell on paper and keep headings with
+   their text. */
+@media print {
+  .ta-back, .to-top { display: none; }
+  .page { max-width: none; padding: 0; }
+  .contents { break-after: avoid; }
+  main h2, main h3, main h4 { break-after: avoid; }
+  section { break-inside: auto; }
+}
+</style>"""
+
+
+def strip_branding(html: str) -> str:
+    """Drop upstream's logo and "powered by" footer from a handed-over page."""
+    html = _LOGO_ANCHOR.sub("", html, count=1)
+    return _CREDIT_FOOTER.sub("", html, count=1)
+
+
+def _back_bar(html: str, href: str, label: str) -> str:
+    found = _TICKER_SPAN.search(html)
+    meta = f'<span class="ta-back__meta">{escape(found.group(1))}</span>' if found else ""
+    return (f'<div class="ta-back"><a href="{escape(href)}">← {label}</a>{meta}</div>\n')
+
+
 #: Our own former addition: provenance used to be appended as a sixth section.
 #: Runs written before that stopped still carry it; the reader does not want it,
 #: so it is dropped on the way out (new runs never write it).
@@ -356,11 +411,19 @@ def _lead_with_name(html: str, name: str) -> str:
     return html.replace(f"<title>{ticker} ", f"<title>{name} {ticker} ", 1)
 
 
-def present(html: str, language: str | None, name: str | None = None) -> str:
-    """Return the page as the run's language asked for it."""
+def present(html: str, language: str | None, name: str | None = None, *,
+            back_href: str | None = None) -> str:
+    """Return the page as the run's language asked for it.
+
+    ``back_href`` is where a same-tab reader came from (the run page). Omitted
+    for a page served without a run context, so no link is ever invented.
+    """
     html = _FORMER_METADATA.sub("", html)
+    html = strip_branding(html)
     if not _is_chinese(language):
-        return _lead_with_name(html, name) if name else html
+        if name:
+            html = _lead_with_name(html, name)
+        return _with_shell(html, back_href, "Back to run")
     for old, new in _replacements():
         html = html.replace(old, new)
     html = _RATING_SPAN.sub(_localise_rating, html)
@@ -376,4 +439,13 @@ def present(html: str, language: str | None, name: str | None = None) -> str:
     html = _number_headings(html)
     if '<style id="ta-cn">' not in html:
         html = html.replace("</head>", _CN_STYLE + "\n</head>", 1)
+    return _with_shell(html, back_href, "返回分析")
+
+
+def _with_shell(html: str, back_href: str | None, back_label: str) -> str:
+    """Inject the shell style, and the way back when there is one."""
+    if '<style id="ta-shell">' not in html:
+        html = html.replace("</head>", _SHELL_STYLE + "\n</head>", 1)
+    if back_href and 'class="ta-back"' not in html:
+        html = html.replace("<body>", "<body>\n" + _back_bar(html, back_href, back_label), 1)
     return html

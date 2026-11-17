@@ -122,12 +122,12 @@
 | `tests/downstream/test_web_runner_worker.py` | 执行序列/产物/失败分类/worker 恢复 |
 | `tests/downstream/test_web_roles.py` | M1 分进程：engine 只出 API、ui 不跑任务、代理转发令牌、SSE 透传、只读令牌不得写、引擎不可达走错误契约 |
 | `tests/downstream/test_web_lazy_stack.py` | ui 进程不加载分析栈：导入 app / 空队列 worker 都不拉 runner；省略 execute 时才解析成 runner |
-| `tests/downstream/test_web_api.py` | 鉴权/校验/队列/页面/SSE/文件越权/报告语言/流程图 |
+| `tests/downstream/test_web_api.py` | 鉴权/校验/队列/页面/SSE/文件越权/报告语言/流程图；报告 CSP 允许用户点击跳转、下载的 HTML 同样去品牌 |
 | `tests/downstream/test_web_labels.py` | 中文标签覆盖全部内核节点与评级枚举 |
 | `tests/downstream/test_web_search.py` | 模糊检索：代码/名称/排序/上限/数据源故障降级 |
 | `tests/downstream/test_report_lint.py` | 报告体检：英文标签/盘中描述/无来源数字/空源误标/口径缺失 |
-| `tests/downstream/test_web_report_page.py` | 报告本地化 + 上游标记守卫 |
-| `tests/downstream/test_web_progress_graph.py` | 拓扑/两套布局/边语义/未选分析师不画 |
+| `tests/downstream/test_web_report_page.py` | 报告本地化 + 上游标记守卫；剥第三方品牌（logo/credit）；同标签页返回入口与 print 规则 |
+| `tests/downstream/test_web_progress_graph.py` | 拓扑/两套布局/边语义/未选分析师不画/卡高与 26px 框距、24/48 交接节奏 |
 | `tests/downstream/test_checkpoint_behavior.py` | 版本/口径/脏工作区使 checkpoint 失效 |
 | `tests/downstream/test_run_metadata.py` | 11 项元数据三处渲染 |
 | `tests/downstream/test_snapshot_routing.py` | 快照路由、契约不变、同源一致 |

@@ -579,13 +579,19 @@ def create_app(
         headers = {"X-Content-Type-Options": "nosniff"}
         if media_type != "text/html":
             return FileResponse(served, media_type=media_type, headers=headers)
+        # `sandbox` still isolates the report; the one relaxation is that a
+        # deliberate click may navigate the tab -- without it the way back is a
+        # dead link.
         headers["Content-Security-Policy"] = (
-            "sandbox; default-src 'none'; style-src 'unsafe-inline'")
+            "sandbox allow-top-navigation-by-user-activation; default-src 'none'; "
+            "style-src 'unsafe-inline'")
         # The artifact stays as the kernel wrote it; only the handed-over copy is
-        # translated into the run's language.
+        # translated into the run's language, stripped of upstream branding, and
+        # given a way back to the run.
         return Response(content=report_page.present(served.read_text(encoding="utf-8"),
                                                    job.get("language"),
-                                                   job.get("display_name")),
+                                                   job.get("display_name"),
+                                                   back_href=f"/runs/{run_id}"),
                         media_type="text/html", headers=headers)
 
     @app.get("/runs/{run_id}/files/{name}", dependencies=[Depends(require_read)])
@@ -597,6 +603,13 @@ def create_app(
         path = security.safe_run_file(run_dir, name)
         if path is None:
             raise HTTPException(status_code=404, detail="not found")
+        if path.suffix.lower() == ".html":
+            # A saved copy is another exit for the same page: strip the third-party
+            # chrome here too, so what is downloaded matches what was read.
+            return Response(content=report_page.strip_branding(
+                                path.read_text(encoding="utf-8")),
+                            media_type="text/html",
+                            headers={"X-Content-Type-Options": "nosniff"})
         return FileResponse(path)
 
     return app
