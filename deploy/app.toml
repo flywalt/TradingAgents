@@ -38,5 +38,5 @@ depends_on = ["engine"]
 
 [[external]]
 name = "rsshub"
-url = "http://127.0.0.1:1200"
-note = "新闻源旁路，缺了降级不阻断；暂不部署（df-tc1 无 docker），再上时见 deploy/rsshub/"
+url = "https://rsshub.dafeis.com"
+note = "新闻源旁路走外部 RSSHub 实例（不在本机），缺了降级不阻断；自托管参考见 deploy/rsshub/"

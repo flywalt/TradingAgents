@@ -11,7 +11,9 @@
 公网 443 ─► Caddy（ta.dafeis.com，handle /* 反代）
               └─► ui   127.0.0.1:8801（页面 + /api/* 流式转发，注入服务令牌）
                     └─► engine 127.0.0.1:8802（队列/worker/SQLite 唯一写者，单实例）
-                          └─► [RSSHub 127.0.0.1:1200 暂未部署：新闻源降级不阻断]
+                          ├─► api.tushare.pro（行情/财务/日历）
+                          ├─► https://opencode.ai/inference/go/openai/v1（LLM，订阅通道）
+                          └─► https://rsshub.dafeis.com（外部实例，不在本机；不可达时新闻源降级）
 ```
 
 - 路径 `/srv/tradingagents`，运行用户 `ubuntu`，venv 由 build 重建；
@@ -23,6 +25,20 @@
 见 [`env.example`](./env.example)。要点：`env_required` 三项（`TRADINGAGENTS_WEB_TOKEN`、
 `OPENAI_COMPATIBLE_API_KEY`、`TUSHARE_TOKEN`）缺失 preflight 直接失败；`TZ=Asia/Shanghai` 必须有
 （否则 0–8 点"今天"算昨天）；`TRADINGAGENTS_HOME` 是状态归位的单一开关。
+
+### 三颗令牌各管一段
+
+| 变量 | 角色 | 谁持有 | 生产现状 |
+| --- | --- | --- | --- |
+| `TRADINGAGENTS_WEB_TOKEN` | 浏览器登录口令（写权限），同时是 ui 的兜底服务令牌 | 人 | 已设，`POST /login` 换取 HttpOnly cookie |
+| `TRADINGAGENTS_ENGINE_TOKEN` | ui → engine 的服务令牌；engine 只认这一颗 | ui 进程 | 已设（`secrets.token_urlsafe(32)`，600）。**设了之后 Web 令牌直打 engine 会被 401** |
+| `TRADINGAGENTS_WEB_READ_TOKEN` | 只读凭据：`require_read` 接口（`/api/runs*`、`/api/engine/health`）可用 | 外部只读调用方 | 未设（无消费方；设之前先修代理的方法分流，见下） |
+
+- 令牌未设时的回退：`engine` 角色在 `TRADINGAGENTS_ENGINE_TOKEN` 为空时退用 `TRADINGAGENTS_WEB_TOKEN`
+  （单机可用，但服务边界消失）；ui 转发同理。
+- **已知缺陷（待修）**：`/api/{path}` 代理对所有方法都用 `require_read`，只读令牌目前能 POST 提交任务。
+  生产未设只读令牌，故当前不可利用；上只读令牌前必须先按方法分流（GET → `require_read`，其余 →
+  `require_write`）。
 
 ## 日常操作（VPS 上）
 
@@ -39,6 +55,24 @@ vps-apps                        # 全机应用清单
 - 健康检查 `/healthz` 走回环；**SSE 链路**（`/api/runs/<id>/events`）如需排障，按
   engine 直打 → ui 直打 → 经 Caddy 三层 `curl -N`（带 `Authorization: Bearer <token>`）对照。
 
+## 备份与恢复（含风险边界）
+
+每天 20:00 由 `vps-deploy` 管理的 cron 写 `/srv/tradingagents/backup/`，保留 7 份：
+
+| 产物 | 内容 | 恢复方式 |
+| --- | --- | --- |
+| `state-YYYYMMDD.db` | `data/web/state.db` 的**在线备份**（SQLite backup API，跑任务时也一致） | 停两个 unit → 覆盖 `data/web/state.db`（先删 `-wal`/`-shm`）→ 起 unit |
+| `memory-YYYYMMDD.tar.gz` | `data/memory/`（决策记忆） | 解到 `data/memory/` |
+| `logs-YYYYMMDD.tar.gz` | `data/logs/`（每份报告与事件实体） | 解到 `data/logs/` |
+
+`data/cache/` 不备（可重建）；`.env` **故意不打包**（令牌不落备份）。
+
+**风险边界（唯一未闭环项）**：备份目录与数据在同一块盘、同一台机器上——单盘故障或误删
+`/srv/tradingagents` 时备份一起没。整机/磁盘级故障由**百度云 ABB 整机备份**兜（定期快照，覆盖
+系统盘与数据盘），因此不额外做异地副本；代价是恢复粒度是"整机回滚"，且快照间隔内的写入会丢。
+要更细的 RPO 时，先在 `deploy/app.toml` 的 `backup.paths` 之外自行同步一份到异地，再改本节。
+
+
 ## 已知边界（运行手册）
 
 - ui 单元 `Requires=engine`。实测（SIGKILL engine 主进程）：engine `Restart=always` 秒级自愈、
@@ -49,10 +83,21 @@ vps-apps                        # 全机应用清单
 - 回滚演练的坏 commit 会短暂经过 `main`——这是拉取式部署的固有形态（工具只从 `origin/main` 取代码），
   bisect 时注意跳过标注 `test(deploy)` 的演练提交。
 
-## RSSHub（暂缓）
+## RSSHub（外部实例）
 
-新闻源旁路走 RSSHub（`deploy/rsshub/docker-compose.yml` 留作将来参考）。df-tc1 不装 docker，
-`app.toml` 里只登记 `[[external]]` 可达性检查（失败仅警告）。再上时：单独立项，不进本标准。
+新闻源旁路走 **`https://rsshub.dafeis.com`**（不在 df-tc1 上，由 infra 侧单独维护；本机 Caddy 无此站点）。
+`app.toml` 的 `[[external]]` 只做可达性提示，失败仅警告、新闻源降级不阻断。
+
+- `RSSHUB_TOKEN` 必须与该实例的 `ACCESS_KEY` 一致，否则所有路由 **403**（代码会归类成
+  `VendorNotConfiguredError`，不重试）。
+- key 会被轮换：2026-11 就轮换过一次，旧 key 在 `.env` 里留了几天，表现为 `/api/preview` 正常但
+  新闻/情绪面全空。轮换后从 infra 侧 `.env`（当前在 `~/projects/eventengine/.env` 的
+  `RSSHUB_ACCESS_KEY`）取新值写入 `/srv/tradingagents/.env`，再 `systemctl restart` 两个 unit。
+- 自检：`curl "$RSSHUB_BASE_URL/xueqiu/hots?key=$RSSHUB_TOKEN"` 应 200 且返回 `<rss`；
+  应用内自检 `.venv/bin/python -c "from tradingagents_cn.vendors import rsshub;
+  print(len(rsshub.parse_items(rsshub.fetch('/xueqiu/hots'))))"`。
+- 本机 docker 是有的（`/usr/bin/docker`），不在这里起 RSSHub 是**部署归属决定**（避免第二份实例与
+  第二处 key），不是能力限制。真要单机自托管时见 `deploy/rsshub/docker-compose.yml`，单独立项。
 
 ## 验收记录（2026-11-16，P2 上线）
 
@@ -73,4 +118,22 @@ vps-apps                        # 全机应用清单
 LLM 后端（2026-11-16 起）：**OpenCode Go 订阅端点** `https://opencode.ai/inference/go/openai/v1`，
 模型 `deepseek-v4.1-flash`，D-0060 注入 `x-opencode-session` + 自报 UA（`billing_source=go` 已实测）。
 注意别把端点配回 `/inference/openai/v1`——那是按量计费通道。
+
+### 上线后补测（2026-11-17）
+
+| 场景 | 实测 | 结果 |
+| --- | --- | --- |
+| 首次真实分析（历史记录，`608d07dd…`，600519.SH / 2026-11-13 / 4 分析师） | 2026-11-16 00:05:37 → 00:06:01 | **failed / internal**：`openai.APIStatusError: 402 Insufficient balance ... pay-as-you-go`——即 D-0060 之前的按量计费通道。**这是唯一一次真实运行，尚未成功跑通一轮** |
+| RSSHub key 轮换后取数 | 11-17 | 403 → **200**，应用内 `rsshub.parse_items(fetch("/xueqiu/hots"))` 返回 **10 条** |
+| 服务令牌边界 | 11-17 | 浏览器令牌直打 engine `/api/runs` → **401 token required**；engine 令牌 → **200**；经 ui 代理登录态 → **200** |
+| 重启后健康 | 11-17 | 两 unit `active`、`NRestarts=0`、`/healthz` 200×2 |
+
+仍未闭环：
+
+1. **成功跑通一轮真实分析**（上表第一行：历史运行因 402 失败，修复后尚未重跑）——验收记录的核心待办；
+2. **`six` 缺失（P0，运行期）**：VPS 干净 venv 里 `import tushare` 抛 `ModuleNotFoundError: No module named 'six'`
+   （tushare 1.4.29 元数据漏声明），13 处 `get_api()` 全线静默降级：`/api/preview` 的 `name` 为 `null`、
+   `/api/search?q=茅台` 返回 `[]`、journal 无告警。家用机能跑只因 `six` 被别的依赖顺带装了。
+   修法：`requirements-downstream.txt` 补 `six>=1.16` + build 冒烟加 `import tushare` + engine 启动自检告警。
+
 
