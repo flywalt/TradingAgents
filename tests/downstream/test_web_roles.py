@@ -162,3 +162,27 @@ def test_an_unreachable_engine_answers_in_the_error_contract(tmp_path):
     body = reply.json()
     assert body["error"]["category"] == "engine_unreachable"
     assert body["error"]["message"] and body["error"]["action"]
+
+
+def test_a_forward_auth_identity_counts_as_a_login_when_trusted(tmp_path, monkeypatch):
+    """Caddy 的 forward_auth 已经验证过身份时，不必再让人输一遍应用口令。
+
+    只对 ui/combined 生效（engine 在 ui 后面，用的是服务令牌）。
+    """
+    monkeypatch.setenv("TRADINGAGENTS_TRUST_FORWARD_AUTH", "1")
+    app = create_app(db_path=str(tmp_path / "state.db"), token=TOKEN, role="ui",
+                     worker=RecordingWorker(), engine_base="http://engine",
+                     proxy_transport=httpx.ASGITransport(app=_stub_engine()))
+
+    with TestClient(app) as client:
+        assert client.get("/", headers={"Remote-User": "dafei"}).status_code == 200
+        assert client.get("/", headers={"Remote-User": ""}).status_code == 401
+
+
+def test_forward_auth_is_not_trusted_unless_enabled(tmp_path):
+    app = create_app(db_path=str(tmp_path / "state.db"), token=TOKEN, role="ui",
+                     worker=RecordingWorker(), engine_base="http://engine",
+                     proxy_transport=httpx.ASGITransport(app=_stub_engine()))
+
+    with TestClient(app) as client:
+        assert client.get("/", headers={"Remote-User": "dafei"}).status_code == 401

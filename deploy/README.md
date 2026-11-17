@@ -36,6 +36,9 @@
 
 - 令牌未设时的回退：`engine` 角色在 `TRADINGAGENTS_ENGINE_TOKEN` 为空时退用 `TRADINGAGENTS_WEB_TOKEN`
   （单机可用，但服务边界消失）；ui 转发同理。
+- **统一鉴权门（vps-deploy `[auth]`）**：站点先过 `auth.dafeis.com`（tinyauth，用户名+密码+TOTP），
+  未认证 302 回登录页并带回原地址；`/healthz` 免鉴权。认证通过后 Caddy 注入 `Remote-User`，
+  设 `TRADINGAGENTS_TRUST_FORWARD_AUTH=1` 时它等同于"已登录"，不再重复要求应用口令（引擎仍只认服务令牌）。
 - 授权分流（D-0064）：`/api/{path}` 代理 GET 走 `require_read`、其余方法走 `require_write`；
   引擎不可达返回 502 且带统一错误体（`error.category=engine_unreachable`）。
 - `env_required` 是**按当前 provider 写死的**（生产用 openai-compatible）。换 provider（如 minimax）时

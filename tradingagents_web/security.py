@@ -15,6 +15,10 @@ TOKEN_ENV = "TRADINGAGENTS_WEB_TOKEN"
 READ_TOKEN_ENV = "TRADINGAGENTS_WEB_READ_TOKEN"
 CORS_ENV = "TRADINGAGENTS_WEB_CORS_ORIGINS"
 KVIEWER_ENV = "KVIEWER_BASE_URL"
+#: When Caddy's forward_auth already authenticated the person, the app does not
+#: need to ask for its own token again. Trust is opt-in: without the flag, a
+#: `Remote-User` header means nothing (it is only as trustworthy as the proxy).
+FORWARD_AUTH_ENV = "TRADINGAGENTS_TRUST_FORWARD_AUTH"
 
 ALLOWED_SUFFIXES = {".html", ".md", ".json", ".log"}
 
@@ -25,6 +29,11 @@ def configured_token() -> str | None:
 
 def configured_read_token() -> str | None:
     return os.environ.get(READ_TOKEN_ENV) or None
+
+
+def trust_forward_auth() -> bool:
+    """Whether a proxy-supplied identity counts as a login (default: no)."""
+    return (os.environ.get(FORWARD_AUTH_ENV) or "").strip().lower() in {"1", "true", "yes"}
 
 
 def cors_origins() -> list[str]:

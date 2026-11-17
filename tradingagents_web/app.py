@@ -189,6 +189,14 @@ def create_app(
         )
 
     # ---------------------------------------------------------------- auth
+    trust_forward = (role != "engine") and security.trust_forward_auth()
+
+    def _forwarded_identity(request: Request) -> str | None:
+        """The person Caddy's forward_auth authenticated, if we trust it."""
+        if not trust_forward:
+            return None
+        return (request.headers.get("Remote-User") or "").strip() or None
+
     def _provided_token(request: Request) -> str | None:
         header = request.headers.get("Authorization", "")
         if header.lower().startswith("bearer "):
@@ -196,13 +204,13 @@ def create_app(
         return request.headers.get("X-Token") or request.cookies.get("tg_web_token")
 
     def require_write(request: Request) -> None:
-        if dev_no_token:
+        if dev_no_token or _forwarded_identity(request):
             return
         if not security.token_matches(_provided_token(request), token):
             raise HTTPException(status_code=401, detail="token required")
 
     def require_read(request: Request) -> None:
-        if dev_no_token:
+        if dev_no_token or _forwarded_identity(request):
             return
         provided = _provided_token(request)
         if security.token_matches(provided, token) or security.token_matches(provided, read_token):
