@@ -30,8 +30,8 @@
 
 | 变量 | 角色 | 谁持有 | 生产现状 |
 | --- | --- | --- | --- |
-| `TRADINGAGENTS_WEB_TOKEN` | 浏览器登录口令（写权限），同时是 ui 的兜底服务令牌 | 人 | 已设，`POST /login` 换取 HttpOnly cookie |
-| `TRADINGAGENTS_ENGINE_TOKEN` | ui → engine 的服务令牌；engine 只认这一颗 | ui 进程 | 已设（`secrets.token_urlsafe(32)`，600）。**设了之后 Web 令牌直打 engine 会被 401** |
+| `TRADINGAGENTS_WEB_TOKEN` | 旧的应用口令（历史）；统一鉴权门接管后**已停用** | — | 已从 `.env` 移除，`[auth]` + `TRADINGAGENTS_TRUST_FORWARD_AUTH=1` 取代它 |
+| `TRADINGAGENTS_ENGINE_TOKEN` | ui → engine 的服务令牌；engine 只认这一颗 | ui 进程 | 已设（`secrets.token_urlsafe(32)`，600），并列入 `env_required` |
 | `TRADINGAGENTS_WEB_READ_TOKEN` | 只读凭据：`require_read` 接口（GET `/api/*`、`/api/engine/health`）可用；**写操作只认 Web 令牌** | 外部只读调用方 | 未设（无消费方；代理已按方法分流，设上即可用） |
 
 - 令牌未设时的回退：`engine` 角色在 `TRADINGAGENTS_ENGINE_TOKEN` 为空时退用 `TRADINGAGENTS_WEB_TOKEN`

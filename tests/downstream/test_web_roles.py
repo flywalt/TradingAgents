@@ -186,3 +186,30 @@ def test_forward_auth_is_not_trusted_unless_enabled(tmp_path):
 
     with TestClient(app) as client:
         assert client.get("/", headers={"Remote-User": "dafei"}).status_code == 401
+
+
+def test_with_forward_auth_the_app_token_can_be_dropped(tmp_path, monkeypatch):
+    """门已经由 Caddy 把住时，应用自己那张登录表单就该退场。
+
+    没有 token、但信任 forward_auth：带 Remote-User 的页面正常，裸请求 401，
+    /login 不再是表单而是跳回首页。
+    """
+    monkeypatch.setenv("TRADINGAGENTS_TRUST_FORWARD_AUTH", "1")
+    app = create_app(db_path=str(tmp_path / "state.db"), token=None, role="ui",
+                     worker=RecordingWorker(), engine_base="http://engine",
+                     proxy_transport=httpx.ASGITransport(app=_stub_engine()))
+
+    with TestClient(app) as client:
+        assert client.get("/", headers={"Remote-User": "dafei"}).status_code == 200
+        naked = client.get("/")
+        assert naked.status_code == 401
+        assert "text/html" not in naked.headers["content-type"]   # 不再吐登录表单
+        login = client.get("/login", follow_redirects=False)
+        assert login.status_code == 303 and login.headers["location"] == "/"
+
+
+def test_without_a_token_and_without_trust_the_app_refuses_to_start(tmp_path):
+    with pytest.raises(RuntimeError):
+        create_app(db_path=str(tmp_path / "state.db"), token=None, role="ui",
+                   worker=RecordingWorker(), engine_base="http://engine",
+                   proxy_transport=httpx.ASGITransport(app=_stub_engine()))

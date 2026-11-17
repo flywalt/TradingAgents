@@ -139,7 +139,11 @@ def create_app(
         # the engine answers to the service token the UI holds
         token = engine_token
     token_value, read_value = token, read_token
-    if not token and not dev_no_token:
+    trust_forward = (role != "engine") and security.trust_forward_auth()
+    #: 只有反代能证明身份时，应用自己那张口令表就没有意义了：gate-only 模式下
+    #: 不注册登录入口，401 也不再吐表单（浏览器由 Caddy 送去统一登录页）。
+    gate_only = trust_forward and not token and not dev_no_token
+    if not token and not dev_no_token and not trust_forward:
         raise RuntimeError(
             f"{security.TOKEN_ENV} is not set; the web shell refuses to start. "
             "Set it, or pass dev_no_token=True on 127.0.0.1 only."
@@ -189,7 +193,6 @@ def create_app(
         )
 
     # ---------------------------------------------------------------- auth
-    trust_forward = (role != "engine") and security.trust_forward_auth()
 
     def _forwarded_identity(request: Request) -> str | None:
         """The person Caddy's forward_auth authenticated, if we trust it."""
@@ -347,7 +350,8 @@ def create_app(
     # the token into; API clients keep receiving JSON.
     @app.exception_handler(HTTPException)
     async def http_exception(request: Request, exc: HTTPException):
-        if exc.status_code != 401 or "text/html" not in request.headers.get("accept", ""):
+        if (exc.status_code != 401 or gate_only
+                or "text/html" not in request.headers.get("accept", "")):
             return JSONResponse({"detail": exc.detail}, status_code=exc.status_code)
         return HTMLResponse("""<!doctype html>
 <html lang="zh"><head><meta charset="utf-8">
@@ -389,21 +393,27 @@ def create_app(
                             secure=secure, max_age=30 * 24 * 3600)
         return response
 
-    @app.post("/login")
-    async def login_form(request: Request):
-        """The form path: the token travels in the body, so a public reverse
-        proxy never records it in an access log. Parsed by hand to keep
-        python-multipart out of the dependency list."""
-        body = (await request.body()).decode("utf-8", "replace")
-        token = parse_qs(body).get("token", [""])[0]
-        return _grant(request, token)
+    if gate_only:
+        @app.api_route("/login", methods=["GET", "POST"])
+        def no_login():
+            """身份由 Caddy 的 forward_auth 提供：这里没有表单一说。"""
+            return RedirectResponse("/", status_code=303)
+    else:
+        @app.post("/login")
+        async def login_form(request: Request):
+            """The form path: the token travels in the body, so a public reverse
+            proxy never records it in an access log. Parsed by hand to keep
+            python-multipart out of the dependency list."""
+            body = (await request.body()).decode("utf-8", "replace")
+            token = parse_qs(body).get("token", [""])[0]
+            return _grant(request, token)
 
-    @app.get("/login")
-    def login(request: Request, token: str = ""):
-        """Set the cookie from a token in the URL. Convenient on a LAN where the
-        only reader of the proxy log is its owner; on a public host use the
-        form, since query strings are logged."""
-        return _grant(request, token)
+        @app.get("/login")
+        def login(request: Request, token: str = ""):
+            """Set the cookie from a token in the URL. Convenient on a LAN where the
+            only reader of the proxy log is its owner; on a public host use the
+            form, since query strings are logged."""
+            return _grant(request, token)
 
     @app.get("/healthz")
     def healthz():

@@ -19,7 +19,7 @@ static_root = "dist"                  # 占位：handle /* 在前，此 root 永
 
 # 按当前 LLM provider（openai-compatible）写死；换 provider 时同步改这一行，
 # 否则 preflight 拦一个用不到的键、放行真正缺的那个（见 deploy/README.md）。
-env_required = ["TRADINGAGENTS_WEB_TOKEN", "OPENAI_COMPATIBLE_API_KEY", "TUSHARE_TOKEN"]
+env_required = ["TRADINGAGENTS_ENGINE_TOKEN", "OPENAI_COMPATIBLE_API_KEY", "TUSHARE_TOKEN"]
 limits = { memory = "800M", cpu = "200%" }
 
 backup = { paths = ["data/web/state.db", "data/memory", "data/logs"], keep = 7, cron = "0 20 * * *" }
