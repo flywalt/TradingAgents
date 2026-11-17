@@ -42,3 +42,10 @@ depends_on = ["engine"]
 name = "rsshub"
 url = "https://rsshub.dafeis.com"
 note = "新闻源旁路走外部 RSSHub 实例（不在本机），缺了降级不阻断；自托管参考见 deploy/rsshub/"
+
+# 统一鉴权门（vps-deploy [auth]）：站点先过 tinyauth，未认证 302 到 auth.dafeis.com；
+# 认证通过时 Caddy 注入 Remote-User 等头（应用内令牌仍是第二道锁）。
+[auth]
+forward = "http://127.0.0.1:8810"
+login = "https://auth.dafeis.com"
+redirect_header = "X-Tinyauth-Location"
