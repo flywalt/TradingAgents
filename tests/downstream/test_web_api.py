@@ -83,8 +83,9 @@ def test_the_queue_cap_is_enforced(client, tmp_path):
     finally:
         conn.close()
 
+    # 队列判据独立于幂等：用一个不被去重命中的载荷（队列里那三条是 2026-10-30）
     response = client.post("/api/runs", headers=AUTH, json={
-        "symbol": "600519.SH", "date": "2026-10-30", "analysts": ["market"]})
+        "symbol": "600519.SH", "date": "2026-10-29", "analysts": ["market"]})
 
     assert response.status_code == 409
     assert response.json()["error"]["category"] == "queue_full"
@@ -480,3 +481,48 @@ def test_the_downloadable_html_artifact_is_also_served_without_branding(client, 
     assert response.status_code == 200
     assert "Tauric" not in response.text
     assert 'class="logo"' not in response.text
+
+
+# ---------------------------------------------------------------- L2 触发护栏
+def test_the_same_request_twice_does_not_buy_two_runs(client):
+    """幂等键 = (标的, 日期, 分析师集合)：双击/重试不该花两份钱。"""
+    payload = {"symbol": "600519.SH", "date": "2026-11-13", "analysts": ["market"]}
+
+    first = client.post("/api/runs", headers=AUTH, json=payload)
+    second = client.post("/api/runs", headers=AUTH, json=payload)
+
+    assert first.status_code == 202 and second.status_code == 202
+    assert first.json()["id"] == second.json()["id"]
+    assert second.json()["deduplicated"] is True
+    assert client.worker.submitted == [first.json()["id"]]
+
+
+def test_a_different_analyst_set_is_a_different_run(client):
+    base = {"symbol": "600519.SH", "date": "2026-11-13"}
+    first = client.post("/api/runs", headers=AUTH, json={**base, "analysts": ["market"]})
+    second = client.post("/api/runs", headers=AUTH, json={**base, "analysts": ["market", "news"]})
+
+    assert first.json()["id"] != second.json()["id"]
+
+
+def test_the_daily_budget_stops_the_fifth_run(client, monkeypatch):
+    monkeypatch.setenv("TRADINGAGENTS_DAILY_RUN_LIMIT", "1")
+    ok = client.post("/api/runs", headers=AUTH,
+                     json={"symbol": "600519.SH", "date": "2026-11-13", "analysts": ["market"]})
+    blocked = client.post("/api/runs", headers=AUTH,
+                          json={"symbol": "000001.SZ", "date": "2026-11-13", "analysts": ["market"]})
+
+    assert ok.status_code == 202
+    assert blocked.status_code == 429
+    body = blocked.json()
+    assert body["error"]["category"] == "budget_exhausted"
+    assert "额度" in body["error"]["message"]
+
+
+def test_force_bypasses_deduplication(client):
+    payload = {"symbol": "600519.SH", "date": "2026-11-13", "analysts": ["market"]}
+    first = client.post("/api/runs", headers=AUTH, json=payload)
+    forced = client.post("/api/runs", headers=AUTH, json={**payload, "force": True})
+
+    assert forced.status_code == 202
+    assert forced.json()["id"] != first.json()["id"]

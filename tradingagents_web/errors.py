@@ -33,6 +33,15 @@ class ReportWriteError(Exception):
     """The report could not be written to disk."""
 
 
+class BudgetExhaustedError(Exception):
+    """Today's analysis quota is used up; the queue would spend real money."""
+
+    def __init__(self, used: int, limit: int):
+        super().__init__(f"{used}/{limit}")
+        self.used = used
+        self.limit = limit
+
+
 class EngineUnreachableError(Exception):
     """The UI process cannot reach the engine process at all."""
 
@@ -42,6 +51,9 @@ def classify(exc: BaseException) -> ErrorInfo:
         return ErrorInfo("queue_full", "已有任务在运行或排队（上限 3）。", "稍后再试。", 409)
     if isinstance(exc, ReportWriteError):
         return ErrorInfo("report_write", "报告写入失败。", "检查磁盘空间与目录权限。")
+    if isinstance(exc, BudgetExhaustedError):
+        return ErrorInfo("budget_exhausted", f"今日分析额度已用完（{exc.used}/{exc.limit}）。",
+                         "明天再试，或调高 TRADINGAGENTS_DAILY_RUN_LIMIT。", 429)
     if isinstance(exc, EngineUnreachableError):
         return ErrorInfo("engine_unreachable", "分析引擎不可达（UI 与引擎之间连接失败）。",
                          "稍后重试；持续出现则检查 engine 单元是否在跑。", 502)

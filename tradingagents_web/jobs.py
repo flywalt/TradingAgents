@@ -22,6 +22,42 @@ def _now() -> str:
     return datetime.now(UTC).isoformat(timespec="seconds")
 
 
+def find_similar(conn: sqlite3.Connection, *, symbol: str, trade_date: str,
+                 analysts: list[str]) -> dict | None:
+    """The run this request would duplicate: same symbol, date and analyst set.
+
+    Cheapest first: SQL narrows on symbol + date, then Python compares the
+    analyst lists as sets (their order is presentation, not identity).
+    """
+    wanted = set(analysts)
+    rows = conn.execute(
+        "SELECT * FROM runs WHERE symbol = ? AND trade_date = ? "
+        "AND status IN ('queued', 'running', 'succeeded') "
+        "ORDER BY created_at DESC", (symbol, trade_date),
+    ).fetchall()
+    for row in rows:
+        try:
+            stored = set(json.loads(row["analysts"] or "[]"))
+        except (TypeError, ValueError):
+            continue
+        if stored == wanted:
+            return dict(row)
+    return None
+
+
+def created_since(conn: sqlite3.Connection, since_iso: str) -> int:
+    """How many runs were created at or after ``since_iso``.
+
+    Both sides are UTC ISO strings: ``created_at`` is written UTC, so the
+    caller converts its "today" boundary into UTC rather than comparing dates
+    (a local 00:30 is still the previous day in UTC).
+    """
+    row = conn.execute(
+        "SELECT COUNT(*) FROM runs WHERE created_at >= ?", (since_iso,)
+    ).fetchone()
+    return int(row[0]) if row else 0
+
+
 def create(
     conn: sqlite3.Connection,
     *,

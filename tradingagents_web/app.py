@@ -10,7 +10,7 @@ import asyncio
 import json
 import logging
 import os
-from datetime import date
+from datetime import UTC, date, datetime, time
 from pathlib import Path
 from urllib.parse import parse_qs
 
@@ -39,7 +39,7 @@ from tradingagents_cn.market import CN_A_SHARE, select_profile
 from tradingagents_cn.symbols import try_normalize
 
 from . import db, jobs, labels, progress_graph, report_page, search, security
-from .errors import EngineUnreachableError, QueueFullError, classify
+from .errors import BudgetExhaustedError, EngineUnreachableError, QueueFullError, classify
 from .worker import Worker
 
 ANALYSTS = ("market", "social", "news", "fundamentals")
@@ -47,6 +47,29 @@ LANGUAGES = ("English", "中文")
 MAX_QUEUED = 3
 
 _log = logging.getLogger("tradingagents_web.app")
+
+#: How many runs a day may be created (0 = no cap). The point is not frugality
+#: in the abstract: one run is minutes of paid model time, and an external
+#: trigger (kviewer) must not be able to queue them by accident.
+DAILY_LIMIT_ENV = "TRADINGAGENTS_DAILY_RUN_LIMIT"
+
+
+def local_day_start_utc() -> str:
+    """Midnight today in the box's timezone, expressed in UTC (created_at's clock)."""
+    now = datetime.now().astimezone()
+    start = datetime.combine(now.date(), time.min).astimezone()
+    return start.astimezone(UTC).isoformat(timespec="seconds")
+
+
+def daily_limit() -> int:
+    raw = (os.environ.get(DAILY_LIMIT_ENV) or "").strip()
+    if not raw:
+        return 0
+    try:
+        return max(int(raw), 0)
+    except ValueError:
+        _log.warning("ignoring %s=%r (not a number)", DAILY_LIMIT_ENV, raw)
+        return 0
 
 
 def _probe_data_vendors() -> None:
@@ -109,6 +132,8 @@ class RunRequest(BaseModel):
     strict: bool = False
     market: str | None = None
     portfolio: dict | None = None
+    #: Re-run even when an identical run already exists (the UI asks first).
+    force: bool = False
 
 
 def create_app(
@@ -452,6 +477,21 @@ def create_app(
             fields = _validated(payload)
         except Exception as exc:  # noqa: BLE001 - mapped below
             return _error(exc)
+        if not payload.force:
+            duplicate = jobs.find_similar(session, symbol=fields["symbol"],
+                                          trade_date=fields["trade_date"],
+                                          analysts=fields["analysts"])
+            if duplicate is not None:
+                # Never buy the same analysis twice: a double click, a retry or
+                # a second device must land on the run that already exists.
+                return {"id": duplicate["id"],
+                        "position": jobs.queue_position(session, duplicate["id"]),
+                        "deduplicated": True}
+        limit = daily_limit()
+        if limit:
+            used = jobs.created_since(session, local_day_start_utc())
+            if used >= limit:
+                return _error(BudgetExhaustedError(used, limit))
         if jobs.queued_count(session) >= MAX_QUEUED:
             return _error(QueueFullError("queue full"))
         run_id = jobs.create(
@@ -462,7 +502,8 @@ def create_app(
             display_name=_display_name(fields),
         )
         background.submit(run_id)
-        return {"id": run_id, "position": jobs.queue_position(session, run_id)}
+        return {"id": run_id, "position": jobs.queue_position(session, run_id),
+                "deduplicated": False}
 
     @app.get("/api/search", dependencies=[Depends(require_read)])
     def search_instruments(q: str = ""):
@@ -492,6 +533,13 @@ def create_app(
         job = jobs.get(session, run_id)
         if job is None:
             raise HTTPException(status_code=404, detail="no such run")
+        # An explicit re-run is not deduplicated (the person asked for it), but
+        # it still spends money: the daily budget applies here too.
+        limit = daily_limit()
+        if limit:
+            used = jobs.created_since(session, local_day_start_utc())
+            if used >= limit:
+                return _error(BudgetExhaustedError(used, limit))
         if jobs.queued_count(session) >= MAX_QUEUED:
             return _error(QueueFullError("queue full"))
         new_id = jobs.create(

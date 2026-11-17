@@ -119,6 +119,7 @@
 | D-0069 | 本条 `fix(web)` | fix | 流程图的框随选择收缩：此前输入分组框是四分析师的手调坐标，只选 1 个分析师时画出四格高的空框。改为**按卡片计算**——宽屏输入框随人数居中收缩，窄屏整张图纵向重排（少一张卡就短 56px）；`_groups()` 统一按 26px 上带/下脚贴住成员卡片，左右侧距统一 14px（顺带修掉 risk 框 12px 的偏差、窄屏输入框 12→14）；宽屏 x 轴改为从「14 内距 + 48 阶段间距」推导，避免手写坐标漂移；`_WIDE`/`_NARROW` 里被函数覆盖的 boxes/groups 死配置删掉，单一事实来源 | 无 | 无 | `test_web_progress_graph.py` 新增 5 项（输入框跟随选择、所有框贴卡、窄屏页高随人数线性变化、侧距一致），参数化覆盖 1/2/4 分析师；4 分析师坐标逐值不变（47 项全绿） |
 | D-0070 | 本条 `feat(web)` | feat | 统一鉴权门接入（应用侧）：`TRADINGAGENTS_TRUST_FORWARD_AUTH=1` 时，Caddy forward_auth 注入的 `Remote-User` 等同于已登录（仅 ui/combined；engine 仍只认服务令牌），避免 tinyauth 之后再让用户输一遍应用口令；默认关闭，头只有代理场景才可信 | 无 | 无 | `test_web_roles.py` 新增 2 项（信任开启时无口令可进、默认不信任） |
 | D-0071 | 本条 `feat(web)` | feat | 应用口令退场：统一鉴权门接管后，`TRADINGAGENTS_WEB_TOKEN` 不再是启动必需项。信任 forward_auth 且未配口令时进入 **gate-only** 模式——不注册 `/login`（303 回首页）、401 不再吐口令表单，身份只来自 Caddy 注入的 `Remote-User`；`env_required` 改为要求 `TRADINGAGENTS_ENGINE_TOKEN`（engine 仍只认服务令牌）。不配口令又不信任 forward_auth 时仍拒绝启动（fail-closed） | 无 | 无 | `test_web_roles.py` 新增 2 项（gate-only 可进且不吐表单、两者皆无则拒启） |
+| D-0072 | 本条 `feat(web)` | feat | L2 触发护栏（服务端，不含真实分析）：① **幂等**——同 `(symbol, trade_date, analysts 集合)` 已有 queued/running/succeeded 时返回原 run id（`deduplicated: true`），`force: true` 才新建；② **每日额度**——`TRADINGAGENTS_DAILY_RUN_LIMIT`（默认 0=不限）按**本地日**换算成 UTC 边界计数，超限返回 429 `budget_exhausted`；③ 队列上限仍在额度之后判定（重试不被额度误伤） | 无 | 无 | `test_web_api.py` 新增 4 项（去重、不同分析师不合并、额度 429、force 绕过） |
 
 十余条下游提交合计新增代码与文档，**0 行上游改动**。下游与上游的唯一耦合是文档里登记的"脆弱耦合"，
 现在由 `tests/downstream/test_sync_guard.py`（12 组断言）机械锁定。
