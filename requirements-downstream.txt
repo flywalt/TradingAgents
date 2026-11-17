@@ -3,6 +3,10 @@
 # upstream project does not need. Install with:
 #   uv pip install -r requirements-downstream.txt
 tushare>=1.4.29
+# tushare 1.4.29 的元数据漏了 `six`（`tushare/trader/trader.py` 无条件 import），
+# 干净 venv 里 `import tushare` 会 ModuleNotFoundError: No module named 'six'。
+# 生产踩过一次：所有 A 股取数静默降级、journal 无告警。别当"无用依赖"清掉。
+six>=1.16
 # Web shell (B4 W1)
 fastapi>=0.115
 uvicorn[standard]>=0.30

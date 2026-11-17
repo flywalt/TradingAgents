@@ -45,3 +45,25 @@ def test_the_downstream_package_imports_from_a_clean_interpreter():
         check=True,
     )
     assert completed.stdout.strip() == "0.1.0.dev0"
+
+
+def test_downstream_requirements_declare_what_the_tushare_sdk_imports():
+    """tushare 1.4.29's metadata omits ``six``; a clean venv cannot import it.
+
+    Production paid for this once: ``import tradingagents_web.app`` stayed green
+    (the client is lazy) while every A-share call degraded silently. ``six`` is
+    therefore declared downstream on purpose -- never "clean up" it as unused.
+    """
+    lines = (REPO_ROOT / "requirements-downstream.txt").read_text(encoding="utf-8").splitlines()
+    declared = {
+        line.split(">")[0].split("=")[0].strip().lower()
+        for line in lines
+        if line.strip() and not line.lstrip().startswith("#")
+    }
+    assert "six" in declared, "tushare 的硬依赖 six 没声明，干净 venv 里 import tushare 会炸"
+
+
+def test_the_deploy_build_smoke_imports_the_tushare_sdk():
+    """A missing runtime import must fail the build, not the first analysis run."""
+    manifest = (REPO_ROOT / "deploy" / "app.toml").read_text(encoding="utf-8")
+    assert "import tushare" in manifest

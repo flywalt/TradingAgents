@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import os
 from datetime import date
 from pathlib import Path
@@ -43,6 +44,32 @@ from .worker import Worker
 ANALYSTS = ("market", "social", "news", "fundamentals")
 LANGUAGES = ("English", "中文")
 MAX_QUEUED = 3
+
+_log = logging.getLogger("tradingagents_web.app")
+
+
+def _probe_data_vendors() -> None:
+    """Build the A-share client once so a broken install is loud, not silent.
+
+    The client is lazy on purpose (optional dependency, and a token can legitimately
+    be absent). In production that laziness cost us: a clean venv without ``six``
+    made every A-share call degrade -- preview ``name: null``, empty search, an
+    empty-but-plausible report -- with nothing in the journal. Building it here is
+    offline and cheap, and turns that class of failure into one warning line.
+
+    Only the process that owns the queue probes (never the UI), and only when the
+    token is configured: an absent token is a normal local state and is covered by
+    the deploy preflight before it can reach production.
+    """
+    try:
+        from tradingagents_cn.vendors.tushare import client as tushare_client
+        if not (os.environ.get(tushare_client.TOKEN_ENV) or "").strip():
+            return
+        tushare_client.get_api()
+    except Exception as exc:  # any failure here means "no A-share data at all"
+        _log.warning(
+            "A-share data probe failed: %s — runs will degrade to empty market/"
+            "fundamental inputs until this is fixed", exc)
 
 #: Display mapping: the report already carries a rating; the UI never renders
 #: it as an order instruction (see spec §9).
@@ -116,6 +143,8 @@ def create_app(
             f"{security.TOKEN_ENV} is not set; the web shell refuses to start. "
             "Set it, or pass dev_no_token=True on 127.0.0.1 only."
         )
+    if role != "ui":
+        _probe_data_vendors()
 
     app = FastAPI(title="TradingAgents Web", docs_url=None, redoc_url=None)
     here = Path(__file__).parent

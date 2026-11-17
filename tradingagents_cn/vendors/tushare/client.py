@@ -175,8 +175,12 @@ def _build_api() -> TushareApi:
     try:
         import tushare as ts
     except ModuleNotFoundError as exc:  # optional downstream dependency
+        # tushare 1.4.29's metadata omits `six` (imported unconditionally by
+        # tushare.trader), so a clean venv fails here with "No module named 'six'".
+        # Name the real cause: without it the journal only shows "not installed".
         raise VendorNotConfiguredError(
-            "tushare is not installed; run: pip install tushare"
+            f"tushare is not importable ({exc}); "
+            "run: pip install -r requirements-downstream.txt"
         ) from exc
     ts.set_token(token)
     return TushareApi(ts.pro_api(token))

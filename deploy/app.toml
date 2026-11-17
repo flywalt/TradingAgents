@@ -9,7 +9,7 @@ build = [
   "python3 -m venv .venv",
   ".venv/bin/pip install -i https://pypi.tuna.tsinghua.edu.cn/simple -r requirements-downstream.txt",
   ".venv/bin/pip install -i https://pypi.tuna.tsinghua.edu.cn/simple -e .",
-  ".venv/bin/python -c 'import tradingagents_web.app'",   # 缺依赖在 build 期暴露，不留给健康检查
+  ".venv/bin/python -c 'import tushare; import tradingagents_web.app'",   # 缺依赖（含 tushare 漏声明的 six）在 build 期暴露，不留给健康检查
 ]
 
 domain = "ta.dafeis.com"

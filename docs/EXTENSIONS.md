@@ -96,6 +96,7 @@
 | 文件 | 覆盖 |
 | --- | --- |
 | `tests/downstream/test_audit_inventory.py` | 本文件与代码同步 |
+| `tests/downstream/test_vendor_readiness.py` | D-0062：engine/combined 启动时构造数据客户端一次（失败只警告、写明真实原因）；ui 进程不碰数据栈 |
 | `tests/downstream/test_go_endpoint_headers.py` | D-0060：Go 端点注入会话头/UA；会话 ID 进程内稳定；非 Go 端点零影响 |
 | `tests/downstream/test_state_home.py` | D-0058：`TRADINGAGENTS_HOME` 开关驱动 default_config 三路径与 web db 兜底；特异目录变量优先 |
 | `tests/downstream/test_bootstrap.py` | 注册门面、签名、幂等、严格隔离 |
