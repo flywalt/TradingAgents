@@ -41,11 +41,30 @@ UNAVAILABLE = {
 }
 
 
+#: The model speaks FRED ("cpi") but also naturally says "china_cpi", "cn_gdp",
+#: "cpi_yoy" in a Chinese run. Normalise rather than lose the query.
+_PREFIXES = ("china_", "chinese_", "cn_", "zh_")
+_SUFFIXES = ("_yoy", "_rate", "_index")
+
+
+def _normalise(indicator: str) -> str:
+    alias = str(indicator).strip().lower().replace("-", "_").replace(" ", "_")
+    for prefix in _PREFIXES:
+        if alias.startswith(prefix):
+            alias = alias[len(prefix):]
+            break
+    for suffix in _SUFFIXES:
+        if alias.endswith(suffix):
+            alias = alias[: -len(suffix)]
+            break
+    return alias
+
+
 def get_macro_indicators(
     indicator: str, curr_date: str, look_back_days: int | None = None
 ) -> str:
     """A Chinese macro series up to ``curr_date``, rendered as a short report."""
-    alias = str(indicator).strip().lower()
+    alias = _normalise(indicator)
     if alias in UNAVAILABLE:
         raise ValueError(
             f"{indicator!r} is not available for A-share runs: {UNAVAILABLE[alias]}. "

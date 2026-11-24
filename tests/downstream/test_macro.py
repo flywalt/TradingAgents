@@ -116,3 +116,36 @@ def test_every_macro_alias_has_a_client_method():
     missing = [endpoint for endpoint, *_ in ALIASES.values()
                if not hasattr(TushareApi, endpoint)]
     assert missing == []
+
+
+@pytest.mark.parametrize("requested,expected", [
+    ("china_cpi", "cpi"),      # 模型在中文运行里自然会说 "china_cpi"
+    ("cn_cpi", "cpi"),
+    ("China_GDP", "gdp"),
+    ("cpi_yoy", "cpi"),
+    ("cn_m2", "m2"),
+])
+def test_country_prefixed_names_resolve_to_our_series(offline, requested, expected):
+    """模型会按 FRED 习惯说 china_cpi / cn_gdp；别让一次宏观查询白跑。"""
+
+    class AnyEndpoint:
+        def __getattr__(self, _name):
+            return lambda **kwargs: pd.DataFrame({
+                "month": ["202607", "202608"], "quarter": ["2026Q2", "2026Q3"],
+                "date": ["20260731", "20260831"],
+                "nt_yoy": [0.5, 0.6], "gdp_yoy": [4.8, 4.9], "m2_yoy": [7.1, 7.2],
+                "ppi_yoy": [1.0, 1.1], "inc_month": [1000, 1100], "pmi010000": [50.1, 50.2],
+                "3m": [1.6, 1.7],
+            })
+
+    client.set_api(AnyEndpoint())
+
+    text = get_macro_indicators(requested, "2026-10-30")
+
+    assert f"({expected})" in text
+
+
+def test_an_unavailable_series_is_still_refused_after_normalising(offline):
+    with pytest.raises(ValueError) as err:
+        get_macro_indicators("china_lpr", "2026-10-30")
+    assert "LPR" in str(err.value)
