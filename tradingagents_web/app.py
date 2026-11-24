@@ -61,6 +61,24 @@ def local_day_start_utc() -> str:
     return start.astimezone(UTC).isoformat(timespec="seconds")
 
 
+def local_clock(iso: str, fmt: str = "%m-%d %H:%M") -> str:
+    """A stored UTC timestamp, rendered in the box's timezone.
+
+    ``created_at``/``started_at`` are written in UTC; the box runs
+    ``TZ=Asia/Shanghai``. Slicing the ISO string (what the templates used to do)
+    showed 01:07 for a 09:07 run, so conversion happens here, once.
+    """
+    if not iso:
+        return ""
+    try:
+        moment = datetime.fromisoformat(str(iso))
+    except ValueError:
+        return ""
+    if moment.tzinfo is None:
+        moment = moment.replace(tzinfo=UTC)
+    return moment.astimezone().strftime(fmt)
+
+
 def daily_limit() -> int:
     raw = (os.environ.get(DAILY_LIMIT_ENV) or "").strip()
     if not raw:
@@ -182,6 +200,7 @@ def create_app(
     templates.env.filters["rating_label"] = lambda value: RATING_LABELS.get(value, value or "")
     # Keep Chinese readable in the markup: the graph travels to the page as JSON.
     templates.env.policies["json.dumps_kwargs"] = {"sort_keys": True, "ensure_ascii": False}
+    templates.env.filters["localtime"] = local_clock
     app.mount("/static", StaticFiles(directory=str(here / "static")), name="static")
 
     background = worker or Worker(path, execute=execute)

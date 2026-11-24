@@ -27,6 +27,22 @@
   var data = svg && svg.dataset.graph ? JSON.parse(svg.dataset.graph) : null;
   var trail = document.getElementById('timeline');
   var statusChip = document.getElementById('status');
+  var phaseLabel = document.getElementById('phase-label');
+  var phaseNote = document.getElementById('phase-note');
+
+  function setStatus(status) {
+    if (!statusChip) return;
+    statusChip.textContent = statusLabels[status] || status;
+    statusChip.className = 'chip ' + status;
+  }
+
+  /* 队列 → 开始的过渡：服务端渲染时可能还是 queued，SSE 的 run.started 一到
+   * 就该把"排队中/已等待"换成"运行中/已运行"，而不是等整页刷新。 */
+  function markStarted() {
+    setStatus('running');
+    if (phaseLabel) phaseLabel.textContent = '已运行';
+    if (phaseNote) phaseNote.textContent = '正在分析，可关闭页面，稍后到历史查看';
+  }
   var elapsed = document.getElementById('elapsed');
   var roundNote = document.getElementById('graph-rounds');
 
@@ -111,6 +127,8 @@
         'data-node': node.id, transform: 'translate(' + node.x + ',' + node.y + ')'
       });
       group.appendChild(element('rect', {width: node.w, height: node.h, rx: 6}));
+      // 完成角标：卡高 40，13px 的字，圆点放右上角，一眼区分"做完"与"没开工"
+      group.appendChild(element('circle', {class: 'node-dot', cx: node.w - 9, cy: 9, r: 3.2}));
       var text = element('text', {x: node.w / 2, y: node.h / 2 + 4, 'text-anchor': 'middle'});
       text.textContent = layoutName === 'wide' ? node.label : node.short;
       group.appendChild(text);
@@ -216,10 +234,22 @@
       var time = document.createElement('time');
       time.className = 'trail__time mono';
       time.dateTime = at;
-      time.textContent = at.slice(11, 19);
+      time.textContent = clockOf(at);
       item.appendChild(time);
     }
     trail.appendChild(item);
+  }
+
+  // 库里是 UTC；页面上按机器时区（Asia/Shanghai）显示
+  var clockFormatter = new Intl.DateTimeFormat('zh-CN', {
+    timeZone: 'Asia/Shanghai', hour12: false,
+    hour: '2-digit', minute: '2-digit', second: '2-digit'
+  });
+
+  function clockOf(iso) {
+    var moment = new Date(iso);
+    if (Number.isNaN(moment.getTime())) return (iso || '').slice(11, 19);
+    return clockFormatter.format(moment);
   }
 
   function elapsedSince(startIso, endIso) {
@@ -267,6 +297,7 @@
   function handle(event) {
     var payload = event.payload || {};
     if (event.kind === 'run.started') {
+      markStarted();
       add('开始运行 ' + (profileLabels[payload.profile] || payload.profile || ''), 'start', event.at);
     } else if (event.kind === 'node.started') {
       startedAt.set(payload.node, event.at);
@@ -282,6 +313,7 @@
     } else if (event.kind === 'report.ready') {
       add('报告已生成 · ' + (reportLabels[payload.key] || payload.key), 'report', event.at);
     } else if (event.kind === 'run.failed') {
+      setStatus('failed');
       Object.keys(state.nodes).forEach(function (id) {
         if (state.nodes[id] === 'active') state.nodes[id] = 'failed';
       });

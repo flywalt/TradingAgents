@@ -968,6 +968,14 @@ input[type="checkbox"] {
 }
 .graph .node--active text { fill: var(--color-ink); }
 .graph .node--done rect { stroke: var(--color-ink-2); fill: var(--color-paper-2); }
+/* 已完成角标：绿色实心点，右上角；未开工/进行中都不显示 */
+.graph .node-dot {
+  fill: var(--color-ok);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--dur-short) var(--ease-out);
+}
+.graph .node--done .node-dot { opacity: 1; }
 .graph .node--done text { fill: var(--color-ink); }
 .graph .node--failed rect { fill: var(--color-bad-soft); stroke: var(--color-bad); stroke-width: 1.5; }
 .graph .node--failed text { fill: var(--color-bad); }

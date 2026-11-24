@@ -120,6 +120,7 @@
 | D-0070 | 本条 `feat(web)` | feat | 统一鉴权门接入（应用侧）：`TRADINGAGENTS_TRUST_FORWARD_AUTH=1` 时，Caddy forward_auth 注入的 `Remote-User` 等同于已登录（仅 ui/combined；engine 仍只认服务令牌），避免 tinyauth 之后再让用户输一遍应用口令；默认关闭，头只有代理场景才可信 | 无 | 无 | `test_web_roles.py` 新增 2 项（信任开启时无口令可进、默认不信任） |
 | D-0071 | 本条 `feat(web)` | feat | 应用口令退场：统一鉴权门接管后，`TRADINGAGENTS_WEB_TOKEN` 不再是启动必需项。信任 forward_auth 且未配口令时进入 **gate-only** 模式——不注册 `/login`（303 回首页）、401 不再吐口令表单，身份只来自 Caddy 注入的 `Remote-User`；`env_required` 改为要求 `TRADINGAGENTS_ENGINE_TOKEN`（engine 仍只认服务令牌）。不配口令又不信任 forward_auth 时仍拒绝启动（fail-closed） | 无 | 无 | `test_web_roles.py` 新增 2 项（gate-only 可进且不吐表单、两者皆无则拒启） |
 | D-0072 | 本条 `feat(web)` | feat | L2 触发护栏（服务端，不含真实分析）：① **幂等**——同 `(symbol, trade_date, analysts 集合)` 已有 queued/running/succeeded 时返回原 run id（`deduplicated: true`），`force: true` 才新建；② **每日额度**——`TRADINGAGENTS_DAILY_RUN_LIMIT`（默认 0=不限）按**本地日**换算成 UTC 边界计数，超限返回 429 `budget_exhausted`；③ 队列上限仍在额度之后判定（重试不被额度误伤） | 无 | 无 | `test_web_api.py` 新增 4 项（去重、不同分析师不合并、额度 429、force 绕过） |
+| D-0073 | 本条 `fix(web)` | fix | 三处界面修正：① **时间按 +08 显示**——新增 `local_clock` 过滤器（库里存 UTC，页面按机器时区渲染），run/history/index 三处不再切 ISO 字符串；事件时间在 JS 里用 `Intl.DateTimeFormat(timeZone: Asia/Shanghai)`；② **状态实时更新**——run 页此前只在 SSE 断开后的轮询里更新状态，打开时是 queued 就一直显示"排队中"；现在 `run.started` 事件到达即切"运行中/已运行"；③ **完成角标**——流程图已完成的节点右上角加绿色实心点（未开工/进行中不显示），与 13px 标签、40px 卡高配套 | 无 | 无 | `test_web_labels.py` 新增 2 项（时区换算、模板不得再切字符串） |
 
 十余条下游提交合计新增代码与文档，**0 行上游改动**。下游与上游的唯一耦合是文档里登记的"脆弱耦合"，
 现在由 `tests/downstream/test_sync_guard.py`（12 组断言）机械锁定。

@@ -14,7 +14,7 @@
         <div><dt>交易日</dt><dd class="mono">{{ run.trade_date }}</dd></div>
         <div><dt>市场</dt><dd title="{{ run.profile }}">{{ profile_names.get(run.profile, run.profile) }}</dd></div>
         <div><dt>语言</dt><dd>{{ run.language }}</dd></div>
-        <div><dt>提交</dt><dd class="mono">{{ run.created_at[5:16].replace('T', ' ') }}</dd></div>
+        <div><dt>提交</dt><dd class="mono">{{ run.created_at | localtime }}</dd></div>
         {% if not running %}
         <div>
           <dt>用时</dt>
@@ -29,9 +29,9 @@
         <p class="reading__label">评级</p>
         <p class="reading">{{ run.rating | rating_label }}</p>
       {% elif running %}
-        <p class="reading__label">{% if run.status == 'queued' %}已等待{% else %}已运行{% endif %}</p>
+        <p class="reading__label" id="phase-label">{% if run.status == 'queued' %}已等待{% else %}已运行{% endif %}</p>
         <p class="reading mono"><span id="elapsed" data-status="{{ run.status }}" data-started="{{ run.started_at or run.created_at }}">00:00</span></p>
-        <p class="run-live">{% if run.status == 'queued' %}已进入队列，开始后可关闭页面。{% else %}正在分析，可关闭页面，稍后到历史查看{% endif %}</p>
+        <p class="run-live" id="phase-note">{% if run.status == 'queued' %}已进入队列，开始后可关闭页面。{% else %}正在分析，可关闭页面，稍后到历史查看{% endif %}</p>
       {% else %}
         <p class="reading__label">结果</p>
         <p class="reading reading--bad">{{ status_labels.get(run.status, run.status) }}</p>
